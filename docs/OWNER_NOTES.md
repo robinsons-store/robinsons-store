@@ -345,7 +345,7 @@ same day: a Statement view on every vendor page (charges and payments in date or
 running balance and a printable layout), so the vendor's mailed statement can be checked
 line by line, and the installment auto-spread pays it down oldest-first.
 
-## Sync vision and linking round, 2026-07-27 (Raviteja)
+## Sync vision and linking round, 2026-07-27 (the developer)
 
 Decisions from this discussion, all shipped the same day unless marked:
 - Vendor "what they supply" info: keep the existing products_we_carry free text as the

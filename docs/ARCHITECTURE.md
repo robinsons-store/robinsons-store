@@ -86,20 +86,20 @@ whether it is healthy, and reports back to Slack.
 
 Facts behind the picture:
 
-- Vercel hosts the app, deploys on push and runs one daily cron. BUILT. The plan is Hobby,
-  which does not license commercial use [R docs/PLATFORM.md:25-44, 74].
+- Vercel hosts the app, deploys on push and runs one daily cron. BUILT. The recorded plan is
+  Hobby unless confirmed otherwise, which does not license commercial use [R docs/PLATFORM.md:26-47, 77].
 - Supabase holds Postgres, Auth and the `documents` storage bucket in ca-central Toronto on
-  the Free plan, which takes no backups. BUILT [R docs/PLATFORM.md:46-64, 75].
+  the Free plan, which takes no backups. BUILT [R docs/PLATFORM.md:49-69, 78].
 - The custom domain `app.robinsonsgeneralstore.ca` is live, verified 2026-08-11. BUILT
-  [R docs/PLATFORM.md:88]. Vianet has no self-serve DNS editor; changes are a phone call
-  [R docs/PLATFORM.md:78]. The domain was due to renew 2026-10-16 and nobody has seen it
-  renew [R docs/HANDOVER.md:231].
-- Anthropic is US-hosted and pay as you go [R docs/PLATFORM.md:76].
+  [R docs/PLATFORM.md:91]. Vianet has no self-serve DNS editor; changes are a phone call
+  [R docs/PLATFORM.md:81]. The domain was due to renew 2026-10-16 and nobody has seen it
+  renew [R docs/HANDOVER.md:43].
+- Anthropic is US-hosted and pay as you go [R docs/PLATFORM.md:79].
 - Resend: the code exists and is off until keys are set; it has never been configured.
   SCAFFOLDED, switch is `RESEND_API_KEY`, `ALERT_EMAIL_FROM`, `ALERT_EMAIL_TO` in Vercel
-  [R src/app/api/alerts/route.ts:98-105] [R docs/STATUS.md:392-393].
+  [R src/app/api/alerts/route.ts:98-105] [R docs/STATUS.md:777-778].
 - Slack carries build requests in and watchdog and migration messages out, through a bot app
-  and an incoming webhook. BUILT [R docs/PLATFORM.md:80]. Build requests are switched on since
+  and an incoming webhook. BUILT [R docs/PLATFORM.md:83]. Build requests are switched on since
   2026-10-30, when `SLACK_REQUEST_CHANNEL` was set (section 8).
 - The Slack build runs Claude Code in GitHub Actions on the app's Anthropic key
   [R .github/workflows/slack-autopilot.yml:195-199]. Migrations and the RLS audit connect to the
@@ -144,17 +144,17 @@ prompt, and a second store on the same app.
 
 | Planned piece | State | Waits on | Evidence |
 |---|---|---|---|
-| Email invoice intake | SCAFFOLDED: AgentMail installed, not wired | The owner creating the invoices@ mailbox | [R docs/REQUIREMENTS.md:154-157] [R docs/PLATFORM.md:85, 155] |
-| QuickBooks export, point-of-sale import | TARGET, QUEUED | Nothing recorded; the owner confirmed the store runs both | [R docs/REQUIREMENTS.md:149-150] |
-| Google Sheets sync, phases 2 and 3 | TARGET, QUEUED | The live sheets shared with the developer's Google account | [R docs/REQUIREMENTS.md:146-148] |
+| Email invoice intake | SCAFFOLDED: AgentMail installed, not wired | The owner creating the invoices@ mailbox | [R docs/REQUIREMENTS.md:188-191] [R docs/PLATFORM.md:85, 155] |
+| QuickBooks export, point-of-sale import | TARGET, QUEUED | Nothing recorded; the owner confirmed the store runs both | [R docs/REQUIREMENTS.md:183-184] |
+| Google Sheets sync, phases 2 and 3 | TARGET, QUEUED | The live sheets shared with the developer's Google account | [R docs/REQUIREMENTS.md:180-182] |
 | Slack questions answered by the assistant | TARGET, not designed | A design; stated as the direction by the developer on 2026-10-30 | [Q: owner] which channel, who may ask, and whether money answers are allowed there |
 | Search index or tool use for Ask | TARGET, deferred | The data outgrowing one prompt | [R docs/PLATFORM.md:179] |
-| A second store | TARGET; the database is already per store | ARCH-13, and the product direction in open pull request #78 | Section 2, section 8 |
+| A second store | TARGET; the database is already per store | ARCH-13, and the product direction in docs/REQUIREMENTS.md | Section 2, section 8 |
 
 Planned inside the app, with no new outside service, all QUEUED: three-way match before
 payment, a food-safety compliance module, recurring obligations and renewals from the
 payments workbook, department photo tiles, and a price-check list
-[R docs/REQUIREMENTS.md:138-158].
+[R docs/REQUIREMENTS.md:172-192].
 
 ## 2. Containers
 
@@ -198,8 +198,8 @@ role, and import uses it when its key is set. GitHub Actions applies database sc
   [R src/app/api/admin/users/route.ts:53]. Feedback triage downloads the screenshot from
   Storage and import archives every uploaded workbook there
   [R src/app/api/feedback-triage/route.ts:56] [R src/app/api/import/route.ts:26]. Documents are
-  viewed through signed URLs, with a public-URL fallback in demo mode [R src/lib/docs.ts:15, 21].
-  The alerts route calls Resend directly when its keys are set [R src/app/api/alerts/route.ts:98].
+  viewed through signed URLs, with a public-URL fallback in demo mode [R src/lib/docs.ts:17-25].
+  The alerts route calls Resend directly when its keys are set [R src/app/api/alerts/route.ts:98-105, 122-133].
   BUILT.
 
 The nine API routes. All BUILT; each exports `preferredRegion = "yul1"`:
@@ -218,7 +218,7 @@ The nine API routes. All BUILT; each exports `preferredRegion = "yul1"`:
 
 AI routes: default model `claude-sonnet-5`, `ANTHROPIC_MODEL` overrides; no temperature is
 sent, on purpose, because current models reject non-default sampling; text answers go
-through `plainText()` [R src/app/api/ask/route.ts:39, 152, 166] [R src/app/api/reorder/route.ts:23, 110]
+through `plainText()` [R src/app/api/ask/route.ts:154, 198] [R src/app/api/reorder/route.ts:84, 102]
 [R src/app/api/feedback-triage/route.ts:82]. BUILT.
 
 AI usage log and daily cap. BUILT: every model call goes through `callClaude`
@@ -237,11 +237,11 @@ run [R supabase/run-order.txt:10-16], so it applies only when that file is rerun
 the SQL editor. Whether it has been rerun on the live database since `ai_call` was added:
 [Q: the developer].
 
-Region: every route asks for Montreal (`yul1`) in code, and the developer set Function Region to Montreal in the Vercel dashboard on 2026-08-17 [R docs/STATUS.md:101-102]. BUILT:
+Region: every route asks for Montreal (`yul1`) in code, and the developer set Function Region to Montreal in the Vercel dashboard on 2026-08-17 [R docs/STATUS.md:459-463]. BUILT:
 production runs in Montreal [V-run, `curl -sD- -o /dev/null https://app.robinsonsgeneralstore.ca/api/health`, `x-vercel-id: cle1::yul1::...`, 2026-10-24].
 The header reads `<edge>::<function region>::<id>`, so the region is the second field; the first is the Vercel edge nearest the caller and varies.
 Whether the code export alone would also work is unknown: the August readings of `iad1` that
-called it a no-op did not record which field they read [R docs/STATUS.md:85].
+called it a no-op did not record which field they read [R docs/STATUS.md:442-451].
 
 ## 3. The capture loop
 
@@ -281,21 +281,21 @@ line, unless the store has used its daily AI allowance; a phone order is typed i
 never touches the AI or Storage. A person fixes or confirms every low-confidence line, then
 any original file is uploaded and the receiving event, its lines and an audit row are written.
 
-- Manual entry needs no file and skips the upload [R src/app/capture/page.tsx:193, 199-201].
+- Manual entry needs no file and skips the upload [R src/app/capture/page.tsx:203, 211-216].
   BUILT. The AI usage reserve and finish around the model call are in section 2
   [R src/lib/anthropic.ts:70, 152, 158].
 
 - The photo is downscaled before sending so a phone picture does not exceed the request body
-  limit; the stored file is the original. BUILT [R src/app/capture/page.tsx:114-122].
+  limit; the stored file is the original. BUILT [R src/lib/imagePrep.ts:124-144].
 - Save is blocked until any discrepancy and any amber line is acknowledged
-  [R src/app/capture/page.tsx:190-193]. The database refuses a line under 0.7 confidence
+  [R src/app/capture/page.tsx:203-205]. The database refuses a line under 0.7 confidence
   with a unit cost unless the event carries `low_confidence_ack`. BUILT
   [R supabase/edit_delete.sql:41-61].
 - Order of writes: file upload first, then `receiving_event`, then `receiving_line`, then
-  `activity_log` [R src/app/capture/page.tsx:199-238]. These are four separate requests from
+  `activity_log` [R src/app/capture/page.tsx:211-244]. These are four separate requests from
   the browser, not one transaction (see ARCH-07).
 - Capture writes no `invoice` row; invoices are entered on the vendor and money screens.
-  BUILT [R src/app/capture/page.tsx:205-238].
+  BUILT [R src/app/capture/page.tsx:218-244].
 
 ## 4. Money: how an invoice's status moves
 
@@ -365,7 +365,7 @@ Beside the status:
 - Overdue: `daysOverdue()` against `due_date`, shown as a red chip; never stored
   [R src/lib/format.ts:33-47] [R supabase/schema.sql:165]. The Overdue screen lists
   `unpaid`, `partially_paid` and `postdated`, and shows post-dated as "post-dated" rather
-  than overdue [R src/app/overdue/page.tsx:46-47, 149-153]. The daily email covers `unpaid`
+  than overdue [R src/app/overdue/page.tsx:45-47, 179-181]. The daily email covers `unpaid`
   and `partially_paid` only [R src/app/api/alerts/route.ts:53-54].
 - Voided invoice: `voided_at` set by `voidRow`; the row drops out of every list
   [R src/lib/edit.ts:17-22] [R supabase/schema.sql:781-797].
@@ -418,13 +418,13 @@ which is how a single cheque settles several invoices and how a deposit waits wi
   not planned [R supabase/schema.sql:3]; ARCH-09 is closed.
 - Nothing in `schema.sql` uses vectors; the only extension created is `pgcrypto`
   [R supabase/schema.sql:5]. pgvector for Ask the store is TARGET, deferred until the data
-  outgrows one prompt [R docs/PLATFORM.md:176].
+  outgrows one prompt [R docs/PLATFORM.md:179].
 
 The store-scoping rule. BUILT: every read filters by the active `store_id` and every insert
-stamps it; child tables scope through their parent [R .claude/skills/robinsons-store/SKILL.md:121].
+stamps it; child tables scope through their parent [R .claude/skills/robinsons-store/SKILL.md:122].
 PARTIAL in the code: a few reads leave scoping to row-level security alone, for example the
 capture screen's list of people (`app_user`) and the shared tax rules
-[R src/app/capture/page.tsx:61, 77].
+[R src/app/capture/page.tsx:62, 78].
 At the database, 14 tables carry their own `store_id` policy: nine in section 3a
 [R supabase/auth_setup.sql:102-133] and the five that carry a dollar figure in section 3e,
 which adds the role fence [R supabase/auth_setup.sql:315-331]. `inventory_count_line`,
@@ -443,7 +443,7 @@ Its migration applies the same policies itself when login is on
 [R supabase/department_field.sql:36-67] and is the last script in the run order
 [R supabase/run-order.txt:30]. A new table needs a policy in `schema.sql`, in
 `auth_setup.sql` (3a, or 3e if it holds a dollar figure), and in a migration for live
-databases [R CLAUDE.md:33-35].
+databases [R CLAUDE.md:36-39].
 
 Soft voids only: `voided_at` and `voided_by` sit on 13 tables from one loop plus `credit_note`
 and `feedback`; shifts are the one hard delete [R supabase/schema.sql:220-221, 240-241, 776-792].
@@ -480,8 +480,8 @@ BUILT: Slack intake is switched on since 2026-10-30, when the repository variabl
 `SLACK_REQUEST_CHANNEL` was set [R .github/workflows/slack-autopilot.yml:105-121].
 BUILT: `develop` and its dev preview exist; a person starts `promote.yml` to open and merge
 a `develop` to `main` pull request after checks pass [R docs/ENVIRONMENTS.md:19-27,54-56]
-[R .github/workflows/promote.yml:24-25,84-113]. Automatic dev migrations wait for the
-`SUPABASE_DB_URL_DEV` secret [R docs/ENVIRONMENTS.md:75]. Production migrations and
+[R .github/workflows/promote.yml:18-19, 119-174]. Automatic dev migrations wait for the
+`SUPABASE_DB_URL_DEV` secret [R docs/ENVIRONMENTS.md:73-75]. Production migrations and
 the health watchdog remain separate workflows, detailed below.
 
 | Step | What happens | State | Evidence |
@@ -492,19 +492,19 @@ the health watchdog remain separate workflows, detailed below.
 | Tier classifier | Script that sorts a diff into A (prose files only, may self-merge), B (app, person merges), C (money, access, database, configuration, automation, and every agent instruction file at any depth; never merges). The Slack loop runs it in a separate job, on a fresh runner, on every pull request it opens and labels the pull request with the tier | PARTIAL: rules tested, not yet run on a live request | [R .github/scripts/classify-change.mjs:25-79] [R .github/workflows/slack-autopilot.yml:462-519] [R .github/workflows/ci.yml:93] |
 | Tier A self-merge | Requires both reviewers to have passed the head commit; starts CI on it, waits, reads the pull request again (open, same commit, same base), merges with the commit pinned; fails closed (ADR-002) | SCAFFOLDED, switch is `AUTOMERGE_TIER_A` = `true` | [R .github/workflows/slack-autopilot.yml:536-584] |
 | CI on autopilot pull requests | A pull request opened with the workflow's token starts no workflow, so ship starts CI on tier A and B pull requests that did not go through the merge step; not tier C, because a dispatched run uses the branch's workflow files | BUILT, not yet run on a live request | [R .github/workflows/slack-autopilot.yml:586-597] |
-| CI gates | `npm run lint`, `npx tsc --noEmit`, `npm run build` with blank Supabase env, plus the automation's own tests | BUILT | [R .github/workflows/ci.yml:3-13, 36-55] |
-| Merge | A person merges, except tier A once switched on. Changes under `.github/` and `.claude/` never merge on their own. Main accepts changes only through a pull request: no direct push, force-push or deletion | BUILT | [R docs/LOOP_ENGINEERING.md:65-110] [V-run, `gh api repos/raviteja0012/robinsons-store/rulesets/25802611`, ruleset "main: pull requests only", active on refs/heads/main, 2026-10-25] |
+| CI gates | `npm run lint`, `npx tsc --noEmit`, `npm run build` with blank Supabase env, plus the automation's own tests | BUILT | [R .github/workflows/ci.yml:3-13, 36-42, 91-96] |
+| Merge | A person merges, except tier A once switched on. Changes under `.github/` and `.claude/` never merge on their own. Main accepts changes only through a pull request: no direct push, force-push or deletion | BUILT | [R docs/LOOP_ENGINEERING.md:65-110] [V-run, `gh api` on ruleset 25802611 of the repository before its move, ruleset "main: pull requests only", active on refs/heads/main, 2026-10-25] |
 | Deploy | Vercel deploys `develop` and pull requests as dev previews; promotion to `main` deploys production | BUILT | [R docs/ENVIRONMENTS.md:19-39] |
-| Migrate | On pushes to `main` or `develop` touching `supabase/**`, applies `supabase/run-order.txt` to the corresponding environment; rebuild and seed scripts are excluded. Automatic dev migrations wait for `SUPABASE_DB_URL_DEV` | BUILT for production; SCAFFOLDED for automatic dev migrations | [R .github/workflows/migrate.yml:33-39,66-96] [R docs/ENVIRONMENTS.md:75] |
+| Migrate | On pushes to `main` or `develop` touching `supabase/**`, applies `supabase/run-order.txt` to the corresponding environment; rebuild and seed scripts are excluded. Automatic dev migrations wait for `SUPABASE_DB_URL_DEV` | BUILT for production; SCAFFOLDED for automatic dev migrations | [R .github/workflows/migrate.yml:33-39,66-96] [R docs/ENVIRONMENTS.md:73-75] |
 | Watchdog | After CI completes on main (waiting 90 seconds), every two hours and by hand, calls `/api/health` and posts to Slack only when the answer changes; checks `PRODUCTION_URL` or falls back to the vercel.app address. It does not check which commit is live | BUILT | [R .github/workflows/post-deploy-watch.yml:16-22, 47-49, 54] |
 | RLS audit | Weekly, Monday 12:23 UTC: lists public tables with RLS off or empty, tells Slack, goes red | BUILT | [R .github/workflows/rls-audit.yml:1-17] |
-| Dev site and promotion | `promote.yml` opens a `develop` to `main` pull request when a person runs it, starts CI on its head commit, and merges with that commit pinned only if CI passed and `develop` holds everything on `main`; otherwise the pull request stays open and the run fails. CI starts by itself on pull requests into and pushes to `develop` | PARTIAL: the merge step has not yet run end to end on GitHub | [R .github/workflows/promote.yml:16-19, 48-56, 107-194] [R .github/workflows/ci.yml:3-7] [V-run, git ls-remote --heads origin, 2026-10-30: develop at cae5104] |
-| Manual tools | `vercel-diagnose`, `vercel-protect`, `slack-announce` run by hand | BUILT | [R docs/PLATFORM.md:79, 153] |
+| Dev site and promotion | `promote.yml` opens a `develop` to `main` pull request when a person runs it, starts CI on its head commit, and merges with that commit pinned only if CI passed and `develop` holds everything on `main`; otherwise the pull request stays open and the run fails. CI starts by itself on pull requests into and pushes to `develop` | PARTIAL: the merge step has not yet run end to end on GitHub | [R .github/workflows/promote.yml:18-19, 53-63, 119-187] [R .github/workflows/ci.yml:3-7] [V-run, git ls-remote --heads origin, 2026-10-30: develop at cae5104] |
+| Manual tools | `vercel-diagnose`, `vercel-protect`, `slack-announce` run by hand | BUILT | [R docs/PLATFORM.md:82] |
 
 Working in Claude Code: the `robinsons-store` skill, with its standards reference, loads from
 `.claude/skills/`; a Stop hook refuses to end a turn while TypeScript is broken
 [R .claude/settings.json:14-19]; update docs/STATUS.md and docs/VERIFICATION.md in the same
-pull request as the work [R CLAUDE.md:23-24]. Human review of every dollar field stays
+pull request as the work [R CLAUDE.md:26-27]. Human review of every dollar field stays
 non-negotiable.
 
 ## 7. Security and privacy
@@ -523,14 +523,14 @@ docs/adr/ADR-005-screenshot-descriptions-follow-the-screenshot.md).
   bucket [R supabase/schema.sql:823-852]. BUILT, for demos only.
 - Row-level security, production: the cutover in `auth_setup.sql` is applied: 21
   `member_store_rw` policies, no open dev policies, the `documents` bucket private, one login
-  account [R docs/STATUS.md:495-498]. That was read live on 2026-10-18 and not re-read
+  account [R docs/STATUS.md:773-775]. That was read live on 2026-10-18 and not re-read
   this session [J-open: killed if `select count(*) from pg_policies where policyname =
   'dev_all'` returns more than 0]. Once `money_by_role.sql` applies, the nine money tables
   carry `money_store_rw` instead of `member_store_rw`, and `receiving_line` also
   `member_store_insert` (ADR-003 condition 3 reads it).
 - Login enforcement in the app is the build-time flag `NEXT_PUBLIC_REQUIRE_AUTH`; with it on,
   the member-facing API routes require a valid session and query as the caller
-  [R src/lib/serverMember.ts:3-10, 35-50]. Two routes are exceptions by design: `/api/health`
+  [R src/lib/serverMember.ts:3-10, 50-66]. Two routes are exceptions by design: `/api/health`
   answers anyone and gives detail only with `CRON_SECRET`, and `/api/alerts` takes the cron
   secret instead of a session [R src/app/api/health/route.ts:127-130]
   [R src/app/api/alerts/route.ts:22-24]. Its production value was not read this session
@@ -540,7 +540,7 @@ docs/adr/ADR-005-screenshot-descriptions-follow-the-screenshot.md).
   [R src/lib/auth.ts:34-40]. Ask withholds invoices from non-money roles and reorder refuses
   them, using the same rule on the server [R src/lib/serverMember.ts:18-21]
   [R src/app/api/ask/route.ts:39] [R src/app/api/reorder/route.ts:33-35]. Extract does not: any signed-in member gets the line
-  costs it reads, because capture is staff work [R src/app/api/extract/route.ts:71-73, 147].
+  costs it reads, because capture is staff work [R src/app/api/extract/route.ts:71-75, 147-149].
   The database applies the same rule as
   `app_auth.can_see_money()` [R supabase/auth_setup.sql:300-309]. BUILT in the repository: the
   nine tables that carry a dollar figure return no rows to staff and refuse their writes, the
@@ -657,7 +657,7 @@ What is in the AI side, layer by layer:
 | Agents | Four in the app (invoice reader, Ask the store, reorder summary, suggestion screenshot reader); the build side has the Slack autopilot and two read-only reviewers. Full register: docs/AGENTS.md | BUILT | [R docs/AGENTS.md] |
 | Model | `claude-sonnet-5`; `ANTHROPIC_MODEL` overrides; no temperature or other sampling setting is sent | BUILT | [R src/lib/anthropic.ts:11-12, 56-58] |
 | One door | Every call goes through `callClaude`: retries 429, 529 and 500, 502, 503, 504 twice with backoff, never retries a timeout or a 400, reads refusal and cut-off from `stop_reason` | BUILT | [R src/lib/anthropic.ts:53-54, 88-121, 137-142] |
-| Prompt | Store data and the question are fenced and marked as data, not instructions | BUILT | [R src/app/api/ask/route.ts:145, 170-175] |
+| Prompt | Store data and the question are fenced and marked as data, not instructions | BUILT | [R src/app/api/ask/route.ts:153-154, 179-183] |
 | Output contract | Invoice reader output is constrained to a JSON schema by the API | BUILT | [R src/app/api/extract/route.ts:43-67, 108] |
 | Grounding | Checks vendor names the Ask answer mentions against the store data and app guide. Unsupported names withhold the answer; the question excuses them only if all occur in the question and the answer has no figures (no digits) | BUILT | [R src/lib/askGrounding.ts:256-290] [R src/app/api/ask/route.ts:185-196] |
 | Human in the loop | Invoice capture requires a person to confirm and save; the database refuses a line under 0.7 confidence with a cost unless a person acknowledged it. Screenshot descriptions save automatically to `feedback_summary`; Ask and reorder answers are displayed, not saved | BUILT | [R src/app/capture/page.tsx:183-229, 432-439] [R supabase/edit_delete.sql:41-61] [R src/app/api/feedback-triage/route.ts:85-91] [R src/app/ask/page.tsx:23-42] [R src/app/reorder/page.tsx:151-157] |
@@ -681,7 +681,7 @@ Risks named after the standards, and where each is handled:
 
 Gap against the multi-store rule: the Ask and reorder prompts and the alert email name the store
 and its town in code, so a second store's assistant would call itself Robinsons
-[R src/app/api/ask/route.ts:62, 145] [R src/app/api/reorder/route.ts:54, 84]
+[R src/app/api/ask/route.ts:71, 154] [R src/app/api/reorder/route.ts:54, 84]
 [R src/app/api/alerts/route.ts:115, 120]. ARCH-13.
 
 ### AI enablement: how requests, requirements and rules reach Claude
@@ -722,11 +722,11 @@ asks are planned.
 
 | Piece | What it does | State | Evidence |
 |---|---|---|---|
-| Suggestions page | Notes, voice and screenshots from the owner and staff; the screenshot reader describes images; "Copy developer digest" makes one block for a build session | BUILT | [R src/app/suggestions/page.tsx:7, 168, 244] |
-| Requirements ledger | Every ask lands verbatim in docs/OWNER_NOTES.md, then gets a SHIPPED, QUEUED or OPEN line in docs/REQUIREMENTS.md. A person triages it in a session | BUILT, by hand | [R docs/REQUIREMENTS.md:284-291] |
+| Suggestions page | Notes, voice and screenshots from the owner and staff; the screenshot reader describes images; "Copy developer digest" makes one block for a build session | BUILT | [R src/app/suggestions/page.tsx:145-169, 182-188, 225-246] |
+| Requirements ledger | Every ask lands verbatim in docs/OWNER_NOTES.md, then gets a SHIPPED, QUEUED or OPEN line in docs/REQUIREMENTS.md. A person triages it in a session | BUILT, by hand | [R docs/REQUIREMENTS.md:318-325] |
 | Rules and templates | CLAUDE.md; the robinsons-store skill and its invariants; the standards file's templates for every document, claim, decision record, diagram, review and basis footer; two read-only reviewers (money, invariants); a typecheck gate on every session | BUILT | [R .claude/skills/robinsons-store/references/standards.md:8-80] [R docs/AGENTS.md] |
-| Slack autopilot | Turns a request in the channel into a draft pull request with Claude Code; the tier classifier labels it | BUILT; switched on 2026-10-30 when the repository variable `SLACK_REQUEST_CHANNEL` was set | [R docs/SLACK_AUTOPILOT.md:138] [V-run, `gh variable list`, 2026-10-30: `SLACK_REQUEST_CHANNEL` set at 20:57 UTC] |
-| Review job on Slack-built pull requests | Two read-only reviewers read every Slack-built pull request before it ships | TARGET, open pull request #82 | Section 6 when it merges |
+| Slack autopilot | Turns a request in the channel into a draft pull request with Claude Code; the tier classifier labels it | BUILT; switched on 2026-10-30 when the repository variable `SLACK_REQUEST_CHANNEL` was set | [R docs/SLACK_AUTOPILOT.md:6-8] [V-run, `gh variable list`, 2026-10-30: `SLACK_REQUEST_CHANNEL` set at 20:57 UTC] |
+| Review job on Slack-built pull requests | Two read-only reviewers read every Slack-built pull request before it ships | BUILT; live request verification tracked privately | [R .github/workflows/slack-autopilot.yml:308-427, 536-540] |
 | Slack questions | Questions asked in Slack answered from the store's data by Ask the store | TARGET, not designed; the developer's stated direction, 2026-10-30 | [Q: owner] as in section 1 |
 | Automatic filing of asks | Suggestions filed into the requirements ledger without a person | TARGET, not designed; the developer's stated direction, 2026-10-30 | None yet |
 
@@ -734,20 +734,20 @@ asks are planned.
 
 Not the enterprise stack: no Snowflake, Fabric, Redpanda, MuleSoft, API gateway or MCP
 governance at this scale. One store, thousands of rows a month; the upgrade path is earned
-only if the business grows to many stores [R .claude/skills/robinsons-store/SKILL.md:25]
-[R robinsons_store_build_spec.md:158]. Budget: $50 to $100 a month typical against a $200
+only if the business grows to many stores [R .claude/skills/robinsons-store/SKILL.md:27]
+[R robinsons_store_build_spec.md:161-168]. Budget: $50 to $100 a month typical against a $200
 ceiling [R docs/PLATFORM.md:13-14].
 
 Also TARGET or declined, with the reasons in docs/PLATFORM.md:
 
 | Capability | State | Evidence |
 |---|---|---|
-| pgvector for Ask the store | TARGET, deferred | [R docs/PLATFORM.md:176] |
-| GPT-4o fallback, AWS Textract | TARGET, deferred | [R .claude/skills/robinsons-store/SKILL.md:23] |
+| pgvector for Ask the store | TARGET, deferred | [R docs/PLATFORM.md:179] |
+| GPT-4o fallback, AWS Textract | TARGET, deferred | [R .claude/skills/robinsons-store/SKILL.md:25] |
 | SMS alerts | TARGET | No SMS code exists [V-run, grep -ril "twilio\|sms" src/, 2026-10-24: no matches] |
-| Email invoice intake (AgentMail) | Installed, not wired | [R docs/PLATFORM.md:82] |
-| Supabase Edge Functions, Realtime | Declined | [R docs/PLATFORM.md:174-175] |
-| Vercel AI Gateway, Blob, Workflows | Declined | [R docs/PLATFORM.md:165-167] |
+| Email invoice intake (AgentMail) | Installed, not wired | [R docs/PLATFORM.md:85] |
+| Supabase Edge Functions, Realtime | Declined | [R docs/PLATFORM.md:177-178] |
+| Vercel AI Gateway, Blob, Workflows | Declined | [R docs/PLATFORM.md:168-170] |
 
 ## 10. Open items
 
@@ -860,3 +860,8 @@ Confirmed: the Slack intake configuration gate; the separate CI gates; promotion
 a person starts it; the recorded dev preview and pending automatic dev migrations. Sources:
 `.github/workflows/slack-autopilot.yml:105-121`, `.github/workflows/ci.yml:28-44`,
 `.github/workflows/promote.yml:24-25,84-113`, and `docs/ENVIRONMENTS.md:19-39,54-56,75`.
+
+**Basis, 2026-10-30 citation refresh:** all 199 file-and-line citations re-read
+against this branch; 60 distinct citations corrected, including references moved to
+other files. The merged review job and feedback_summary references match their implementations.
+Sources: the cited repository files; the citation change table is in docs/VERIFICATION.md.
