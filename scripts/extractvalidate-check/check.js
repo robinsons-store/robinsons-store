@@ -87,6 +87,12 @@ t("a numeric string subtotal is kept, warned, and still checked", strSub.data.pr
 const ret = inv({ ...none, printed_subtotal: 15 }, [line({}), line({ description: "RETURN dock line", qty: -2, unit_cost: 5 })]);
 t("a return zeroed by the value checks no longer makes the subtotal", ret.data.totals_mismatch === true);
 t("the screen's tax rate is used when given", checkTotals([{ qty: 1, unit_cost: 100 }], { ...none, printed_total: 105 }, 0.05).status === "match" && checkTotals([{ qty: 1, unit_cost: 100 }], { ...none, printed_total: 105 }).status === "mismatch");
+const l113 = [{ qty: 1, unit_cost: 113 }];
+t("lines that make a total with no subtotal or tax printed are tax-included", checkTotals(l113, { ...none, printed_total: 113 }).taxIncluded === true);
+t("lines with HST on top at the rate are not tax-included", checkTotals([{ qty: 1, unit_cost: 100 }], { ...none, printed_total: 113 }).taxIncluded === false);
+t("lines that make the printed subtotal are not tax-included", checkTotals(l113, { ...none, printed_subtotal: 113, printed_total: 127.69 }).taxIncluded === false);
+t("a printed tax rules out tax-included, even at 0.00", checkTotals(l113, { ...none, printed_hst: 0, printed_total: 113 }).taxIncluded === false && checkTotals(l113, { ...none, printed_hst: 13, printed_total: 113 }).status === "mismatch");
+t("a mismatch is never tax-included", checkTotals(l113, { ...none, printed_total: 200 }).taxIncluded === false);
 const partial = checkTotals([{ qty: null, unit_cost: 5 }, { qty: 2, unit_cost: null }, { qty: 2, unit_cost: 12.5 }], { ...none, printed_subtotal: 25 });
 t("a missing qty or cost counts as 0, as on the capture screen", partial.status === "match" && partial.computed === 25);
 t("invoice number trimmed, label kept", inv({ ...none, invoice_number: "  INVOICE NO. NB-20417 " }).data.invoice_number === "INVOICE NO. NB-20417");

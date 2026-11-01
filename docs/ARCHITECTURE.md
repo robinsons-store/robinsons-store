@@ -876,7 +876,7 @@ a person starts it; the recorded dev preview and pending automatic dev migration
 Sections 3 and 8 on branch capture-invoice-checks. Confirmed: every `[R]` added or re-pointed
 in those sections opened at its line (route schema, totals check, Capture gate, tick, card and
 vendor match, notes prefill, the confidence trigger); the totals check, vendor match and notes
-rule by `scripts/extractvalidate-check` (92 of 92, and failing under each of seven deliberate
+rule by `scripts/extractvalidate-check` (97 of 97, and failing under each of seven deliberate
 breaks of the code); the eight findings of an independent read-only review, each fixed and
 covered by a test; the 25 cases by `scripts/aievals-check` (124 of 124) and by
 `npm run eval:ai -- --offline` through the real route (24 of 24, the known gap still failing);
