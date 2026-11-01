@@ -30,7 +30,7 @@ written for, and how current it is. Start here.
 
 | File | For | What it answers |
 |---|---|---|
-| [REQUIREMENTS.md](REQUIREMENTS.md) | Builder | Product direction, multi-store delivery states and configuration gaps; every ask with its state: shipped, queued, or waiting on the owner. **If it is not here, it is not agreed.** |
+| [REQUIREMENTS.md](REQUIREMENTS.md) | Builder | Product direction, multi-store delivery states and configuration gaps; department fields edited by the owner and readable by managers; every ask with its state: shipped, queued, or waiting on the owner. **If it is not here, it is not agreed.** |
 | [STATUS.md](STATUS.md) | Builder | What is built right now, and the before-production checklist |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Builder | The stack, data and capture flows, the develop-to-main release diagram, the AI enablement view, the target context with planned pieces in colour, and the colour key; citations checked against main on 2026-10-30 |
 | [PLATFORM.md](PLATFORM.md) | Builder | Every service and plan in use, what is adopted, and what is deliberately declined with the reason. **Carries two open risks: the Vercel plan and database backups** |

@@ -18,6 +18,8 @@
     ]
   },
   "include": [
-    "../../src/lib/vendorFields.ts"
+    "../../src/lib/vendorFields.ts",
+    "../../src/lib/fieldChoices.ts",
+    "../../src/lib/departments.ts"
   ]
 }

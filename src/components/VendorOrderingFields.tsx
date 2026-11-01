@@ -17,6 +17,7 @@ import {
 } from "@/lib/vendorOrdering";
 import { FieldError, fieldInputClass, type FieldErrors } from "@/components/FieldError";
 import { asksFor } from "@/lib/vendorFields";
+import type { FieldChoices } from "@/lib/fieldChoices";
 
 export type OrderingProfile = {
   minimum_order_amount: string;
@@ -39,7 +40,7 @@ export const EMPTY_ORDERING_PROFILE: OrderingProfile = {
 };
 
 export function VendorOrderingFields({
-  value, onChange, errors, showMoney, departmentName
+  value, onChange, errors, showMoney, departmentName, choices
 }: {
   value: OrderingProfile;
   onChange: (patch: Partial<OrderingProfile>) => void;
@@ -57,8 +58,11 @@ export function VendorOrderingFields({
   // every question comes back. The button belongs to the page rather than to this block so
   // that one press restores the whole form, not just the four fields below.
   departmentName?: string | null;
+  // That department's ticks on the Department fields screen. The page passes the same ones
+  // its own fields and its validation use, so this block cannot disagree with the save path.
+  choices?: FieldChoices;
 }) {
-  const asks = (key: string) => asksFor(departmentName, key, { showMoney });
+  const asks = (key: string) => asksFor(departmentName, key, { showMoney, choices });
   // Nothing in this block applies to this department, so the heading would sit above an
   // empty space.
   if (!asks("minimum_order") && !asks("summer_order_timeline") && !asks("order_location") && !asks("reorder")) {

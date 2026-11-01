@@ -6,7 +6,7 @@
 export type NavIcon =
   | "home" | "feed" | "charts" | "capture" | "overdue" | "payments" | "vendors" | "reports" | "reorder"
   | "inventory" | "signs" | "knowledge" | "ask" | "people" | "schedule" | "wrench" | "shield"
-  | "import" | "team" | "more";
+  | "import" | "team" | "fields" | "more";
 
 export type NavItem = { href: string; label: string; icon: NavIcon };
 export type NavGroup = { label: string | null; items: NavItem[]; adminOnly?: boolean };
@@ -61,7 +61,8 @@ export const NAV_GROUPS: NavGroup[] = [
     adminOnly: true,
     items: [
       { href: "/import", label: "Import data", icon: "import" },
-      { href: "/team", label: "Team", icon: "team" }
+      { href: "/team", label: "Team", icon: "team" },
+      { href: "/department-fields", label: "Department fields", icon: "fields" }
     ]
   }
 ];

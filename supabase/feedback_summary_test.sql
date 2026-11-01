@@ -1,8 +1,11 @@
 -- Proves auth_setup.sql 3g at the database: the AI's description of a suggestion screenshot opens
--- to lead, manager and owner of its store and to the member who attached the screenshot, the same
--- people who may open the screenshot (3f), counting only a file saved by the time the description
--- was; whoever may read one may write it, only for the suggestion it belongs to and the file that
--- suggestion names; nobody removes one; and the suggestion itself carries no description.
+-- to the members of its store who may open the file it was read from (3f), for a suggestion
+-- screenshot lead, manager, owner and the member who attached it, counting only a file saved by
+-- the time the description was; a description whose file is missing, saved later, in another
+-- store's folder or of another kind follows that file's rule, money roles included; the database
+-- dates every save, so a replacement screenshot read again opens to whoever saved it; whoever
+-- may read one may write it, only for the suggestion it belongs to and the file that suggestion
+-- names; nobody removes one; and the suggestion itself carries no description.
 -- docs/adr/ADR-005-screenshot-descriptions-follow-the-screenshot.md says why it is built this way.
 --
 -- Run it on a DISPOSABLE database, never the store's, with the storage schema that Supabase's
@@ -41,8 +44,9 @@ insert into actor values
 -- The suggestions. "file" is the screenshot it names and "uploader" the actor whose account saved
 -- that file (null: saved before login was on). "described" says the suggestion already has a
 -- description, written as the table owner below; "readers" is who may read that description.
+-- "stored" is false for a file named but never saved.
 create temp table suggestion (key text primary key, id uuid, store_id uuid, file text, uploader text,
-                              described boolean, readers text);
+                              described boolean, readers text, stored boolean default true);
 insert into suggestion values
   ('A staff screenshot', 'a0500000-0000-4000-8002-000000000001', 'a0500000-0000-4000-8000-00000000000a',
    'a0500000-0000-4000-8000-00000000000a/feedback/1_a05_staff.png', 'staff', true, 'owner,manager,lead,staff'),
@@ -53,15 +57,26 @@ insert into suggestion values
   ('older A screenshot, no uploader', 'a0500000-0000-4000-8002-000000000004', 'a0500000-0000-4000-8000-00000000000a',
    'feedback/2_a05_old_anon.png', null, true, 'owner,manager,lead'),
   ('A description with no screenshot', 'a0500000-0000-4000-8002-000000000005', 'a0500000-0000-4000-8000-00000000000a',
-   null, null, true, 'owner,manager,lead'),
+   null, null, true, ''),
   ('B screenshot', 'a0500000-0000-4000-8002-000000000006', 'a0500000-0000-4000-8000-00000000000b',
    'a0500000-0000-4000-8000-00000000000b/feedback/1_a05_owner_b.png', 'owner_b', true, 'owner_b'),
   ('A file saved after its description', 'a0500000-0000-4000-8002-000000000009', 'a0500000-0000-4000-8000-00000000000a',
-   'a0500000-0000-4000-8000-00000000000a/feedback/5_a05_staff2_later.png', 'staff2', true, 'owner,manager,lead'),
+   'a0500000-0000-4000-8000-00000000000a/feedback/5_a05_staff2_later.png', 'staff2', true, ''),
   ('A staff new', 'a0500000-0000-4000-8002-000000000007', 'a0500000-0000-4000-8000-00000000000a',
    'a0500000-0000-4000-8000-00000000000a/feedback/3_a05_staff_new.png', 'staff', false, ''),
   ('A owner new', 'a0500000-0000-4000-8002-000000000008', 'a0500000-0000-4000-8000-00000000000a',
-   'a0500000-0000-4000-8000-00000000000a/feedback/4_a05_owner_new.png', 'owner', false, '');
+   'a0500000-0000-4000-8000-00000000000a/feedback/4_a05_owner_new.png', 'owner', false, ''),
+  ('A workbook', 'a0500000-0000-4000-8002-000000000010', 'a0500000-0000-4000-8000-00000000000a',
+   'a0500000-0000-4000-8000-00000000000a/imports/6_a05_owner_workbook.xlsx', 'owner', true, 'owner,manager'),
+  ('A naming a store B file', 'a0500000-0000-4000-8002-000000000011', 'a0500000-0000-4000-8000-00000000000a',
+   'a0500000-0000-4000-8000-00000000000b/feedback/2_a05_owner_b.png', 'owner_b', true, ''),
+  ('A replaced screenshot', 'a0500000-0000-4000-8002-000000000013', 'a0500000-0000-4000-8000-00000000000a',
+   'a0500000-0000-4000-8000-00000000000a/feedback/9_a05_staff2_second.png', 'staff2', false, '');
+insert into suggestion (key, id, store_id, file, uploader, described, readers, stored) values
+  ('A file never stored', 'a0500000-0000-4000-8002-000000000012', 'a0500000-0000-4000-8000-00000000000a',
+   'a0500000-0000-4000-8000-00000000000a/feedback/7_a05_missing.png', null, true, '', false),
+  ('A owner new, never stored', 'a0500000-0000-4000-8002-000000000014', 'a0500000-0000-4000-8000-00000000000a',
+   'a0500000-0000-4000-8000-00000000000a/feedback/8_a05_missing_new.png', null, false, '', false);
 create function pg_temp.s(p_key text) returns suggestion language sql as $$
   select * from suggestion where key = p_key;
 $$;
@@ -75,13 +90,27 @@ insert into feedback (id, store_id, kind, body, screenshot_path)
 insert into storage.objects (bucket_id, name, owner_id)
   select 'documents', s.file, a.auth_id::text
   from suggestion s left join actor a on a.name = s.uploader
-  where s.file is not null;
+  where s.file is not null and s.stored;
 insert into feedback_summary (feedback_id, store_id, screenshot_path, summary)
   select id, store_id, file, 'ADR-005 description of ' || key from suggestion where described;
 -- A file under that name saved after its description, the way a removed file's name could be
--- saved again: its uploader does not get the description.
-update feedback_summary set created_at = now() - interval '1 minute'
-  where feedback_id = 'a0500000-0000-4000-8002-000000000009';
+-- saved again: nobody gets the description through it.
+update storage.objects set created_at = now() + interval '1 minute'
+  where bucket_id = 'documents' and name = (pg_temp.s('A file saved after its description')).file;
+-- A replaced screenshot: staff2 saved a first file, it was described, then staff2 saved a second
+-- file and the suggestion now names that one. Backdating the description needs the save-date
+-- trigger off for this one write, as the table owner.
+insert into storage.objects (bucket_id, name, owner_id, created_at)
+  values ('documents', 'a0500000-0000-4000-8000-00000000000a/feedback/9_a05_staff2_first.png',
+          'a0500000-0000-4000-8000-0000000000a5', now() - interval '3 minutes');
+update storage.objects set created_at = now() - interval '1 minute'
+  where bucket_id = 'documents' and name = (pg_temp.s('A replaced screenshot')).file;
+alter table feedback_summary disable trigger feedback_summary_dated;
+insert into feedback_summary (feedback_id, store_id, screenshot_path, summary, created_at)
+  values ((pg_temp.s('A replaced screenshot')).id, (pg_temp.s('A replaced screenshot')).store_id,
+          'a0500000-0000-4000-8000-00000000000a/feedback/9_a05_staff2_first.png',
+          'ADR-005 description of the first file', now() - interval '2 minutes');
+alter table feedback_summary enable trigger feedback_summary_dated;
 
 do $$
 begin
@@ -179,6 +208,9 @@ select pg_temp.expect('feedback has no ai_summary column', '0',
    where table_schema = 'public' and table_name = 'feedback' and column_name = 'ai_summary'));
 select pg_temp.expect('feedback_summary has row-level security on', 'true',
   (select relrowsecurity::text from pg_class where oid = 'public.feedback_summary'::regclass));
+select pg_temp.expect('the database dates every save of a description', 'feedback_summary_dated',
+  (select string_agg(tgname, ',') from pg_trigger
+   where tgrelid = 'public.feedback_summary'::regclass and not tgisinternal and tgenabled = 'O'));
 
 -- Demo: the table is open like every other one.
 do $$
@@ -218,21 +250,25 @@ begin
   end loop;
 
   -- 3. The suggestions themselves stay open to the whole store: Suggestions lists every one.
-  perform pg_temp.expect('staff2 lists every store A suggestion', '8',
+  perform pg_temp.expect('staff2 lists every store A suggestion',
+    (select count(*)::text from suggestion where store_id = (pg_temp.s('A staff screenshot')).store_id),
     pg_temp.rows_as('staff2', format('select 1 from public.feedback where store_id = %L',
       (pg_temp.s('A staff screenshot')).store_id)));
-  perform pg_temp.expect('staff2 reads no store A description', '0',
+  perform pg_temp.expect('staff2 reads only the description of their own first screenshot', '1',
     pg_temp.rows_as('staff2', format('select 1 from public.feedback_summary where store_id = %L',
       (pg_temp.s('A staff screenshot')).store_id)));
 
   -- 4. Writing, the way the screenshot reader does: whoever may read the description, for the
   -- suggestion's own file.
-  perform pg_temp.expect('staff cannot date a description ahead', 'refused 42501',
+  perform pg_temp.expect('staff sends a save date a day ahead', 'ok 1',
     pg_temp.run_as('staff', format(
       'insert into public.feedback_summary (feedback_id, store_id, screenshot_path, summary, created_at) '
       'values (%L, %L, %L, %L, now() + interval %L)',
       (pg_temp.s('A staff new')).id, (pg_temp.s('A staff new')).store_id, (pg_temp.s('A staff new')).file,
       'ADR-005 dated ahead', '1 day')));
+  perform pg_temp.expect('the database dates it now instead', 'true',
+    (select (created_at = now())::text from public.feedback_summary
+     where feedback_id = (pg_temp.s('A staff new')).id));
   perform pg_temp.expect('staff saves the description of their own screenshot', 'ok 1',
     pg_temp.saves('staff', 'A staff new', (pg_temp.s('A staff new')).file));
   perform pg_temp.expect('staff reads it', '1', pg_temp.reads('staff', 'A staff new'));
@@ -259,6 +295,37 @@ begin
   perform pg_temp.expect('owner saves the description of their own screenshot', 'ok 1',
     pg_temp.saves('owner', 'A owner new', (pg_temp.s('A owner new')).file));
   perform pg_temp.expect('staff cannot read it', '0', pg_temp.reads('staff', 'A owner new'));
+
+  -- 4b. Money roles pass the same file check: no description without a file they may open.
+  perform pg_temp.expect('owner cannot describe a file that was never stored', 'refused 42501',
+    pg_temp.saves('owner', 'A owner new, never stored', (pg_temp.s('A owner new, never stored')).file));
+  perform pg_temp.expect('owner cannot rewrite a description whose file was never stored', 'refused 42501',
+    pg_temp.saves('owner', 'A file never stored', (pg_temp.s('A file never stored')).file));
+  perform pg_temp.expect('owner cannot describe a store B file on a store A suggestion', 'refused 42501',
+    pg_temp.saves('owner', 'A naming a store B file', (pg_temp.s('A naming a store B file')).file));
+  perform pg_temp.expect('lead cannot describe a workbook', 'refused 42501',
+    pg_temp.saves('lead', 'A workbook', (pg_temp.s('A workbook')).file));
+  perform pg_temp.expect('manager rewrites the description of a workbook', 'ok 1',
+    pg_temp.saves('manager', 'A workbook', (pg_temp.s('A workbook')).file));
+  perform pg_temp.expect('lead still cannot read it', '0', pg_temp.reads('lead', 'A workbook'));
+
+  -- 4c. A replaced screenshot read again: the description moves to the new file, dated by the
+  -- database, and opens to whoever saved that file.
+  perform pg_temp.expect('staff2 reads the description of their first screenshot', '1',
+    pg_temp.reads('staff2', 'A replaced screenshot'));
+  perform pg_temp.expect('owner reads the replacement screenshot again', 'ok 1',
+    pg_temp.saves('owner', 'A replaced screenshot', (pg_temp.s('A replaced screenshot')).file));
+  perform pg_temp.expect('the new description is dated now', 'true',
+    (select (created_at = now())::text from public.feedback_summary
+     where feedback_id = (pg_temp.s('A replaced screenshot')).id));
+  perform pg_temp.expect('staff2, who saved the replacement, reads it', '1',
+    pg_temp.reads('staff2', 'A replaced screenshot'));
+  perform pg_temp.expect('lead reads the replacement description', '1',
+    pg_temp.reads('lead', 'A replaced screenshot'));
+  perform pg_temp.expect('staff cannot read the replacement description', '0',
+    pg_temp.reads('staff', 'A replaced screenshot'));
+  perform pg_temp.expect('staff2 reads their replacement again themselves', 'ok 1',
+    pg_temp.saves('staff2', 'A replaced screenshot', (pg_temp.s('A replaced screenshot')).file));
 
   -- 5. Changing the suggestion does not change who reads its description: the description keeps
   -- the file it was read from. Any member may still point a suggestion at another file (3a).

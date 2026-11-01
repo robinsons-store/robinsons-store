@@ -27,3 +27,4 @@ ai_call.sql
 money_by_role.sql
 documents_by_role.sql
 feedback_summary.sql
+department_field.sql

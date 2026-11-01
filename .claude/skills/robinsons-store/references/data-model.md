@@ -22,6 +22,7 @@
 - HR: employee, effective-dated pay_rate, and shift (the weekly schedule and hours). The /hr and /hr/schedule screens.
 - tax_rules keyed by province for portability. Ontario 13 percent HST is the working default.
 - activity_log: actor_id, action, entity, entity_id. Audit on every write.
+- department_field: store_id, department_id, form (vendor or invoice), field_key, asked, updated_by. One row per box changed on the /department-fields screen, unique per department, form and question. No rows means the code lists apply. Only the owner writes it; every store member, including managers, can read it; there is no delete [R supabase/auth_setup.sql:170-199].
 
 ## Deferred
 - pgvector RAG for ask-your-store at scale, ML-based reorder points, and SMS alerts. The current ask and reorder agents pass store data directly as context; see docs/STATUS.md.

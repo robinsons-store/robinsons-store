@@ -67,6 +67,15 @@ const REQUIRED_COLUMNS: Record<string, Record<string, string>> = {
   }
 };
 
+// Every table a release added after the first schema, and the script that creates it. A
+// column list cannot say this: when the whole table is missing even the `id` probe fails,
+// and missingColumns reads that as a database problem with no script to run.
+//
+// KEEP THIS CURRENT the same way: a release that adds a table adds it here in the same change.
+const REQUIRED_TABLES: Record<string, string> = {
+  department_field: "department_field.sql"
+};
+
 // The sentence a person can act on, built from the scripts the missing columns came from.
 // Every script in run-order.txt is idempotent, so "run it again" is always a safe answer and
 // saying so removes the one reason somebody would hesitate.
@@ -256,6 +265,30 @@ export async function GET(req: NextRequest) {
       checks.push({ name: `${table} columns present`, ok: false, detail: fix, fix });
     } catch (e: any) {
       checks.push({ name: `${table} columns present`, ok: false, detail: e?.message });
+    }
+  }
+
+  // 6. The tables the current release needs exist. A missing one is a script nobody ran, and
+  // the screen that writes it cannot save; the forms that read it carry on with their usual
+  // questions, so nothing else shows the gap.
+  for (const [table, script] of Object.entries(REQUIRED_TABLES)) {
+    try {
+      const { error } = await db.from(table).select("id").limit(1);
+      if (!error) {
+        checks.push({ name: `${table} table present`, ok: true });
+        continue;
+      }
+      // Only a missing table earns the script. Any other error (the database not answering,
+      // a refused read) is reported as it is, without sending anyone to the SQL editor.
+      const absent = error.code === "42P01" || error.code === "PGRST205" || /does not exist|could not find the table/i.test(error.message || "");
+      if (!absent) {
+        checks.push({ name: `${table} table present`, ok: false, detail: error.message });
+        continue;
+      }
+      const fix = `${table} does not exist yet. ${runThese([script])}`;
+      checks.push({ name: `${table} table present`, ok: false, detail: full ? `${error.message}. ${fix}` : fix, fix });
+    } catch (e: any) {
+      checks.push({ name: `${table} table present`, ok: false, detail: e?.message });
     }
   }
 

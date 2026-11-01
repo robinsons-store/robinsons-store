@@ -24,6 +24,10 @@ bash scripts/invoicefields-check/run.sh
 `@/lib/...` requires that tsc leaves in the output to `./...` with sed, copies `check.js`
 into `out/` and runs it with node.
 
-Run it whenever `invoiceFields.ts` or `departments.ts` changes. The department matrix
-at the top of check.js is the contract. It tests the matrix only: the edit form's save path
-is not covered here.
+Run it whenever `invoiceFields.ts`, `departments.ts` or `fieldChoices.ts` changes. The
+department matrix at the top of check.js is the contract, and with no rows from the
+Department fields screen it must still hold exactly. The assertions added on 2026-10-25 pin
+what that screen may change (delivery, PO number, property work, terms) and what it may not
+(number, date, amount, tax, freight, filing, due date, status), and that a section takes its
+department's invoice shape. It tests the matrix only: the edit form's save path is not
+covered here.

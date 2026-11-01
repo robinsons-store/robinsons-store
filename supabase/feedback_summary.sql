@@ -10,9 +10,9 @@
 --   Demo (the open dev_all policies are still on invoice): the new table gets the same open
 --     dev_all policy as every other table.
 --   Enforced login (auth_setup.sql has run): exactly section 3g of auth_setup.sql. A description
---     opens to lead, manager and owner of its store, and to the member who attached the
---     screenshot, the people who may open a suggestion screenshot (3f). Keep this and
---     auth_setup.sql 3g identical; supabase/feedback_summary_test.sql checks both.
+--     opens to the members of its store who may open the file it was read from (3f), and only
+--     while that file is the one saved under its name by the time the description was saved.
+--     Keep this and auth_setup.sql 3g identical; supabase/feedback_summary_test.sql checks both.
 --
 -- Each mode is written as a function in pg_temp, which disappears when the session ends, so the
 -- statements read as plain SQL rather than as strings passed to execute.
@@ -34,6 +34,23 @@ begin
   );
   create index if not exists feedback_summary_store_idx on public.feedback_summary(store_id);
   alter table public.feedback_summary enable row level security;
+
+  -- The database dates every save, whatever the writer sends, so a description read again from a
+  -- replacement screenshot counts that file (3g) and its uploader keeps reading it.
+  create or replace function public.feedback_summary_dated()
+  returns trigger
+  language plpgsql
+  set search_path = public
+  as $body$
+  begin
+    new.created_at := now();
+    return new;
+  end;
+  $body$;
+  drop trigger if exists feedback_summary_dated on public.feedback_summary;
+  create trigger feedback_summary_dated
+    before insert or update on public.feedback_summary
+    for each row execute function public.feedback_summary_dated();
 
   -- Copies any description saved on feedback.ai_summary before this table existed into it,
   -- once, dated now, then drops that column.
@@ -67,10 +84,10 @@ language plpgsql
 as $fn$
 begin
   -- 3g. Whether the signed-in member may read the description of this screenshot: a member of the
-  -- description's store who sees money, or who may open the screenshot itself, which for a
-  -- suggestion file means the member who attached it (3f). Only the file saved under that name by
-  -- the time the description was saved counts, so a file saved later under the same name does not
-  -- carry it. A description with no screenshot named opens to the money roles only.
+  -- description's store who may open the file it was read from (3f), which for a suggestion file
+  -- means lead, manager, owner and the member who attached it. Only the file saved under that name
+  -- by the time the description was saved counts. A description whose file is not found that way,
+  -- or that names no file, opens to nobody.
   create or replace function app_auth.can_read_screenshot_summary(
     summary_store uuid, path text, written_at timestamptz)
   returns boolean
@@ -79,13 +96,11 @@ begin
   security definer
   set search_path = public
   as $body$
-    select coalesce(
-      summary_store = app_auth.my_store_id()
-      and (app_auth.can_see_money()
-        or app_auth.can_open_document(path,
-          (select o.owner_id from storage.objects o
-           where o.bucket_id = 'documents' and o.name = path and o.created_at <= written_at))),
-      false);
+    select coalesce(bool_or(
+        summary_store = app_auth.my_store_id()
+        and app_auth.can_open_document(o.name, o.owner_id)), false)
+    from storage.objects o
+    where o.bucket_id = 'documents' and o.name = path and o.created_at <= written_at;
   $body$;
   revoke execute on function app_auth.can_read_screenshot_summary(uuid, text, timestamptz)
     from public, anon;
@@ -93,7 +108,7 @@ begin
     to authenticated;
 
   -- Whoever may read a description may write it, for the suggestion it belongs to and the file that
-  -- suggestion names, dated no later than now, so the reader runs as the member who asked for it.
+  -- suggestion names, dated by the database, so the reader runs as the member who asked for it.
   -- No policy lets a member remove one.
   drop policy if exists dev_all on public.feedback_summary;
   drop policy if exists member_store_rw on public.feedback_summary;

@@ -168,6 +168,17 @@ SHIPPED (see VERIFICATION.md for sign-off):
   that future field assignments become one-line data edits, is exactly right and is the
   point.
 
+- Select fields per department in the vendor, payment and invoice profiles (relayed
+  2026-10-25: "We need ability to select fields in vendor profile, payment profile and invoice
+  profile on department level", reported as not done). PARTIAL 2026-10-25: the Department
+  fields screen (Admin) lets the owner tick, per department, which vendor and
+  invoice questions the forms ask, stored in the department_field table; no rows means the
+  code lists above apply. Managers can read the choices [R supabase/auth_setup.sql:170-199].
+  Sections follow the department they sit under on every form. Locked
+  whatever the screen says: vendor name and status; invoice number, date, amount, tax,
+  freight, filing, due date and status. OPEN: which payment questions should vary by
+  department [Q: the requester]; the payment forms are unchanged until that is answered.
+
 QUEUED (agreed, not built):
 - Department photo tiles and knowledge-note photo attachments, sourced from the owner's
   walkthrough (one photo per department from his phone; website photos ruled out).

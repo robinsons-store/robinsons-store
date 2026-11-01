@@ -51,7 +51,17 @@
 // and the edit form writes hidden answers back rather than nulling them, so no map edit can
 // destroy or strand data. Changing this map changes which questions get asked, nothing else.
 
+// THE DEPARTMENT FIELDS SCREEN, added 2026-10-25. The scopes below are now the USUAL answer.
+// The owner can change any unlocked question per department; managers can read the choices.
+// The owner's ticks arrive here as `choices` (fieldChoices.ts). The locked questions are the
+// ones what-is-owed and the filing rule depend on: number, date, amount, tax, freight,
+// filing, due date and status. The screen cannot change them, because hiding one would let
+// an invoice save without the facts that decide what the store owes and when. Freight keeps
+// its scope (not asked of Payrolls & Taxes): invoiceTotal adds a saved freight whatever the
+// form shows, so a department that could untick it would owe a figure nobody can see or fix.
+
 import { canonicalDepartment } from "@/lib/departments";
+import type { FieldChoices } from "@/lib/fieldChoices";
 
 export type InvoiceScope = "all" | { only: string[] } | { except: string[] };
 
@@ -62,20 +72,24 @@ export type InvoiceFieldDef = {
   /** The invoice columns this group covers. Documentation and test surface, like vendorFields. */
   columns: string[];
   scope: InvoiceScope;
+  /** The Department fields screen cannot change it: the scope below is the only answer. */
+  locked?: boolean;
 };
 
 export const INVOICE_FIELDS: InvoiceFieldDef[] = [
-  { key: "invoice_number", label: "Invoice number", columns: ["invoice_number"], scope: "all" },
-  { key: "invoice_date", label: "Invoice date", columns: ["invoice_date"], scope: "all" },
-  { key: "amount", label: "Invoice subtotal", columns: ["amount"], scope: "all" },
-  { key: "tax", label: "Tax", columns: ["tax_mode", "hst_amount"], scope: "all" },
+  { key: "invoice_number", label: "Invoice number", columns: ["invoice_number"], scope: "all", locked: true },
+  { key: "invoice_date", label: "Invoice date", columns: ["invoice_date"], scope: "all", locked: true },
+  { key: "amount", label: "Invoice subtotal", columns: ["amount"], scope: "all", locked: true },
+  { key: "tax", label: "Tax", columns: ["tax_mode", "hst_amount"], scope: "all", locked: true },
   {
     key: "freight",
     label: "Freight charge",
     columns: ["freight_charges"],
     // A payroll remittance or an incorporation tax has nothing shipped, so freight on the
     // Payrolls & Taxes form was only noise. Everyone else ships things.
-    scope: { except: ["Payrolls & Taxes"] }
+    scope: { except: ["Payrolls & Taxes"] },
+    // Part of what the invoice owes (invoiceTotal), so not the screen's to hide.
+    locked: true
   },
   {
     key: "delivery",
@@ -106,10 +120,10 @@ export const INVOICE_FIELDS: InvoiceFieldDef[] = [
     // the trade, and what was actually done.
     scope: { only: ["Property Maintenance"] }
   },
-  { key: "filing", label: "Final invoice filing", columns: ["invoice_filing", "digital_file_location"], scope: "all" },
+  { key: "filing", label: "Final invoice filing", columns: ["invoice_filing", "digital_file_location"], scope: "all", locked: true },
   { key: "terms", label: "Terms", columns: ["terms"], scope: "all" },
-  { key: "due_date", label: "Due date", columns: ["due_date"], scope: "all" },
-  { key: "status", label: "Payment status", columns: ["status"], scope: "all" }
+  { key: "due_date", label: "Due date", columns: ["due_date"], scope: "all", locked: true },
+  { key: "status", label: "Payment status", columns: ["status"], scope: "all", locked: true }
 ];
 
 /**
@@ -119,11 +133,24 @@ export const INVOICE_FIELDS: InvoiceFieldDef[] = [
  * through here, so they cannot drift apart the way the three hand-coded booleans did.
  *
  * Sections and aliases resolve through canonicalDepartment, so a vendor filed under Chip
- * Stand gets Grocery's invoice shape, exactly as it gets Grocery's vendor questions.
+ * Stand gets Grocery's invoice shape, exactly as it gets Grocery's vendor questions. A
+ * section such as Gifts is resolved to its department by the caller (fieldDepartment), so
+ * it gets DryGoods & Lakeside's shape rather than the unknown-department one.
+ *
+ * `choices` are the Department fields screen's ticks for this department. They beat the
+ * scope below on every question except a locked one.
  */
-export function asksInvoice(departmentName: string | null | undefined, key: string): boolean {
+export function asksInvoice(
+  departmentName: string | null | undefined,
+  key: string,
+  choices?: FieldChoices
+): boolean {
   const field = INVOICE_FIELDS.find((f) => f.key === key);
   if (!field) return false;
+  if (!field.locked) {
+    const chosen = choices?.get(key);
+    if (chosen !== undefined) return chosen;
+  }
   if (field.scope === "all") return true;
   const canon = canonicalDepartment(departmentName);
   if ("only" in field.scope) {

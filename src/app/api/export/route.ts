@@ -26,6 +26,9 @@ type TableSpec = {
   parent?: { table: string; column: string };
   what: string;
   links: string;
+  // A table a later migration adds. If its script has not run yet, its tab says so instead
+  // of the whole export failing.
+  optional?: boolean;
 };
 
 const TABLES: TableSpec[] = [
@@ -55,6 +58,7 @@ const TABLES: TableSpec[] = [
   { name: "tax_rules", scope: "global", what: "Province tax rates (reference)", links: "" },
   { name: "feedback", scope: "store", what: "Owner suggestion box (ideas, problems, screenshots, voice notes)", links: "store_id -> store.id; author_id -> app_user.id" },
   { name: "feedback_summary", scope: "store", what: "What the AI read off each suggestion screenshot", links: "feedback_id -> feedback.id; store_id -> store.id" },
+  { name: "department_field", scope: "store", optional: true, what: "Which vendor and invoice questions each department is asked, as changed on the Department fields screen (no row means the usual list)", links: "store_id -> store.id; department_id -> department.id; updated_by -> app_user.id" },
   { name: "activity_log", scope: "parent", parent: { table: "app_user", column: "actor_id" }, what: "Audit trail of every write", links: "actor_id -> app_user.id" },
 ];
 
@@ -88,6 +92,15 @@ export async function GET(req: NextRequest) {
       let rows: any[] = [];
       if (spec.scope === "self") {
         rows = await readTable(db, spec.name, (q) => q.eq("id", storeId));
+      } else if (spec.scope === "store" && spec.optional) {
+        try {
+          rows = await readTable(db, spec.name, (q) => q.eq("store_id", storeId));
+        } catch (err: any) {
+          if (err?.code !== "42P01" && err?.code !== "PGRST205") throw err;
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[`(${spec.name} is not set up on this database yet)`]]), spec.name.slice(0, 31));
+          readme.push({ table: spec.name, rows: 0, what: spec.what, relationships: spec.links, note: "Not set up on this database yet" });
+          continue;
+        }
       } else if (spec.scope === "store") {
         rows = await readTable(db, spec.name, (q) => q.eq("store_id", storeId));
       } else if (spec.scope === "global") {

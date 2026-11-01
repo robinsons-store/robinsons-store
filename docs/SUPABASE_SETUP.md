@@ -142,12 +142,19 @@ Run in this order; skip nothing (each is safe to re-run):
 12. `feedback_summary.sql`: the AI's description of a suggestion screenshot gets its own table,
    `feedback_summary` (docs/adr/ADR-005-screenshot-descriptions-follow-the-screenshot.md).
    Descriptions already on `feedback.ai_summary` move into it, then that column is dropped.
-   With enforced login a description opens to lead, manager and owner, and to the member who
-   attached the screenshot; on a demo database the table is open like the others. It must run
+   With enforced login a description opens to the members who may open the file it was read
+   from (lead, manager and owner, and the member who attached the screenshot), and the
+   database dates every save; on a demo database the table is open like the others. It must run
    after `documents_by_role.sql`, and it is the same block as `auth_setup.sql` section 3g.
    `feedback_summary_test.sql` is its proof, for a disposable database with Supabase's storage
    schema only; it is never in the run order.
-13. `auth_setup.sql`: ONLY if enforced login is on. Always re-run it LAST after any script
+13. `department_field.sql`: the table behind the Department fields screen. One row per box
+   somebody changed: this department, this form (vendor or invoice), this question, asked or
+   not. An empty table means every form asks its usual questions, so running it changes no
+   screen. With enforced login it applies its own policies (every member reads, only the owner
+   writes, nobody deletes), so the screen works without rerunning
+   `auth_setup.sql`.
+14. `auth_setup.sql`: ONLY if enforced login is on. Always re-run it LAST after any script
    above, because it (re)applies the per-store policies to every table including new ones.
 
 ## What each remaining file is

@@ -4,7 +4,7 @@
 |---|---|
 | Status | PROPOSED, 2026-10-25 |
 | Proposer | The developer |
-| Deciders | Ravi Kiran, store owner (approver; chose who opens a suggestion screenshot in ADR-004) |
+| Deciders | Ravi Kiran, store owner (approver) |
 | Technical owner | The developer |
 | Supersedes | Nothing. Extends ADR-004 ruling 2 to the text read from a screenshot |
 
@@ -15,10 +15,9 @@ text so the developer digest carries the picture as words
 [R `src/app/api/feedback-triage/route.ts:14-26`]. The description is drawn from the screenshot,
 so it can name whatever the screen showed.
 
-Ravi Kiran chose who opens a suggestion screenshot: lead, manager, owner, and the member who
-attached it (ADR-004 ruling 2) [D: the owner's answer as relayed to the developer, 2026-10-25,
-confirm with Ravi Kiran]. The suggestion itself, its note and the screen it names, opens to
-every member of the store, because anyone may add to or follow the suggestion box
+Who opens a suggestion screenshot: lead, manager, owner, and the member who attached it
+(ADR-004 ruling 2) [D: the owner's requirement, 2026-10-25]. The suggestion itself, its note
+and the screen it names, opens to every member of the store, because anyone may add to or follow the suggestion box
 [R `supabase/auth_setup.sql:111-114, 126-130`]. So the description needs the screenshot's rule, not the
 suggestion's.
 
@@ -36,25 +35,28 @@ Two facts shape where it lives:
    suggestion: the suggestion, its store, the stored file it was read from, and the text
    [R `supabase/schema.sql:246-258`] [R `supabase/auth_setup.sql:628-639`]. The suggestion
    carries no description.
-2. **Who reads it.** A member of its store who sees money (lead, manager, owner), or who may
-   open the file it was read from, which for a suggestion file is the account that saved it
-   (ADR-004 ruling 2). Only the file saved under that name by the time the description was
-   saved counts, so a file saved later under the same name does not carry it. One check,
+2. **Who reads it.** A member of its store who may open the file it was read from, by ADR-004's
+   rule for that file: for a suggestion file, lead, manager, owner and the account that saved
+   it. Every role passes the same file check. Only the file saved under that name by the time
+   the description was saved counts. A description that names no file, or whose file is not
+   found that way, opens to nobody. One check,
    `app_auth.can_read_screenshot_summary`, calls the stored-file check of ADR-004
-   [R `supabase/auth_setup.sql:658-682`]; one policy, `feedback_summary_read`, uses it
-   [R `supabase/auth_setup.sql:692-695`].
+   [R `supabase/auth_setup.sql:675-697`]; one policy, `feedback_summary_read`, uses it
+   [R `supabase/auth_setup.sql:707-710`].
 3. **The file goes with the text.** The rule reads the file named on the description, not the
    suggestion's current one, so editing a suggestion never changes who reads its description
    (`supabase/feedback_summary_test.sql` section 5).
 4. **Who writes it.** Whoever may read a description may write it, only for the suggestion it
-   belongs to and the file that suggestion names, dated no later than the moment it is saved
-   [R `supabase/auth_setup.sql:696-716`]. The screenshot reader runs as the member who asked
+   belongs to and the file that suggestion names [R `supabase/auth_setup.sql:699-731`]. The
+   database dates every save, a rewrite included, whatever the writer sends, so reading a
+   replacement screenshot again opens the new description to whoever saved the new file
+   [R `supabase/auth_setup.sql:641-656`]. The screenshot reader runs as the member who asked
    for it and saves with an upsert, so running it twice keeps one row
-   [R `src/app/api/feedback-triage/route.ts:85-90`]. No policy lets a member remove a
+   [R `src/app/api/feedback-triage/route.ts:85-91`]. No policy lets a member remove a
    description.
 5. **Older descriptions move once.** Descriptions saved on `feedback.ai_summary` are copied into
    the new table with the file their suggestion named, dated the day they move, and the column
-   is dropped [R `supabase/auth_setup.sql:641-656`]. A blank one is not copied.
+   is dropped [R `supabase/auth_setup.sql:658-673`]. A blank one is not copied.
 6. **Applied without a person.** `supabase/feedback_summary.sql` runs from `run-order.txt` after
    `documents_by_role.sql`, whose check it uses [R `supabase/run-order.txt:28-29`]. With enforced
    login it is exactly `auth_setup.sql` section 3g; on a demo database the new table gets the
@@ -74,13 +76,14 @@ Two facts shape where it lives:
    the same check, the way this table is.
 2. `supabase/feedback_summary_test.sql` passes on a fresh copy and an upgraded copy before any
    change to section 3g merges.
-3. After the merge, three read-only checks on the live database:
+3. After each merge that changes section 3g, four read-only checks on the live database:
    `select policyname, cmd from pg_policies where tablename = 'feedback_summary'` returns
    exactly `feedback_summary_read SELECT`, `feedback_summary_resave UPDATE` and
-   `feedback_summary_save INSERT` (policies add up, so any other one could open the
-   descriptions again);
+   `feedback_summary_save INSERT` (policies add up, so these must be the only three);
+   `select tgname from pg_trigger where tgrelid = 'public.feedback_summary'::regclass and not tgisinternal`
+   returns exactly `feedback_summary_dated`;
    `select count(*) from information_schema.columns where table_name = 'feedback' and column_name = 'ai_summary'`
-   returns 0; and `select count(*) from public.feedback_summary` says how many descriptions moved.
+   returns 0; and `select count(*) from public.feedback_summary` says how many descriptions there are.
 4. The staff smoke test of ADR-004 condition 4 also checks that a staff member sees the
    description of their own screenshot and not of the owner's.
 
@@ -91,17 +94,14 @@ Accepted costs:
 - Staff see the description of their own screenshots only. On another member's suggestion they
   see the note and the screen it names, and a digest they copy lists that screenshot by its
   file name.
-- The app update and the migration land within minutes of each other on merge. Until both
-  have, the older page cannot load Suggestions, or the newer one shows no descriptions, and a
-  screenshot read in that window is not saved. The suggestion itself is always saved.
 - The reader leaves figures out of a description; the developer opens the screenshot when a number
   matters.
 - A description of a screenshot saved before login was on, which has no recorded uploader,
   opens to lead, manager and owner only, the same as the screenshot (ADR-004).
-- Lead, manager and owner read every description in their store, including one whose file
-  none of them opens (an older file whose store could not be told, ADR-004 ruling 4).
+- A description whose file is not in storage, or that names no file, opens to nobody; the
+  suggestion and its note still show.
 - Every save of a description writes an `activity_log` row for the member who asked for it, so
-  a rewritten description shows who wrote it [R `src/app/api/feedback-triage/route.ts:91-94`].
+  a rewritten description shows who wrote it [R `src/app/api/feedback-triage/route.ts:93-96`].
 - Each description read runs one check per row. Suggestions reads one store's descriptions.
 
 Benefits:
@@ -147,7 +147,11 @@ the storage schema made by supabase/storage-api v1.79.5, on copies built fresh f
 upgraded from main 4dfc97c, and upgraded from the stored-files branch; and by running the
 Suggestions reads and the screenshot reader's calls through PostgREST v14.18 and the storage
 service with `@supabase/supabase-js` 2.106.2 as owner, manager, lead, two staff and a second
-store's lead. The owner's choice is `[D]` until Ravi Kiran confirms it. Reviewed by an
-independent invariant and security read; the audit row, the rule on files saved later under the
-same name, the open-items number and three wording changes came from it. Sources: this repository, the local test databases, the
-owner's relayed answer.
+store's lead. The owner's requirement is `[D]` until Ravi Kiran confirms it. Sources: this
+repository, the local test databases, the owner's requirement.
+Amended 2026-10-30 (branch claude/feedback-summary-follow-up): rulings 2 and 4, condition 3 and
+the accepted costs re-read after the file check for every role and the database save date were
+added: 8 references opened at the named lines, 8 confirmed; the first version's live apply read
+with `gh run list` (Apply database scripts succeeded on main 373b2b5). The new cases in sections
+4b and 4c of `supabase/feedback_summary_test.sql` have not run yet [J-open: killed if any fails
+on a disposable Supabase stack].

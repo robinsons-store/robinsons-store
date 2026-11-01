@@ -91,5 +91,66 @@ t("'Property Taxes' resolves to Property Maintenance whole, not a finance-proper
 t("'Lakeside Hardware' resolves to Dry Goods whole, so no PO number",
   asks("Lakeside Hardware", "delivery") && !asks("Lakeside Hardware", "po_number"));
 
+// THE DEPARTMENT FIELDS SCREEN, 2026-10-25. The vendor page now resolves a section to its
+// department before asking, and the owner's ticks beat the scopes except on locked questions.
+const D = require("./departments.js");
+const C = require("./fieldChoices.js");
+const DEPTS = [
+  { id: "dry", name: "DryGoods & Lakeside", parent_department_id: null },
+  { id: "clo", name: "Clothing", parent_department_id: "dry" },
+  { id: "gif", name: "Gifts", parent_department_id: "dry" },
+  { id: "hw", name: "Hardware", parent_department_id: null },
+  { id: "gc", name: "Garden Center", parent_department_id: "hw" },
+  { id: "bak", name: "Bakery", parent_department_id: null },
+  { id: "pm", name: "Property Maintenance", parent_department_id: null }
+];
+const KEYS = R.INVOICE_FIELDS.map(f => f.key);
+const shapeOf = (name, choices) => KEYS.map(k => `${k}=${R.asksInvoice(name, k, choices)}`).join(" ");
+for (const [id, parent] of [["clo", "DryGoods & Lakeside"], ["gif", "DryGoods & Lakeside"], ["gc", "Hardware"]]) {
+  const section = DEPTS.find(d => d.id === id).name;
+  const top = D.fieldDepartment(id, DEPTS);
+  t(`${section} invoices take ${parent}'s shape`, !!top && shapeOf(top.name) === shapeOf(parent));
+}
+t("Garden Center invoices now ask the PO number, as Hardware's do",
+  asks(D.fieldDepartment("gc", DEPTS).name, "po_number") === true && asks("Garden Center", "po_number") === false);
+
+const ROWS = [
+  { department_id: "bak", form: "invoice", field_key: "po_number", asked: true },
+  { department_id: "bak", form: "invoice", field_key: "delivery", asked: false },
+  { department_id: "bak", form: "invoice", field_key: "terms", asked: false },
+  { department_id: "bak", form: "invoice", field_key: "amount", asked: false },
+  { department_id: "bak", form: "vendor", field_key: "terms", asked: true },
+  { department_id: "pm", form: "invoice", field_key: "property_work", asked: false }
+];
+const bak = C.choicesFor(ROWS, "bak", "invoice");
+const EMPTY = C.choicesFor([], "bak", "invoice");
+t("no rows means the pinned matrix above, department by department",
+  Object.keys(MATRIX).every(d => shapeOf(d, EMPTY) === shapeOf(d)));
+t("a tick adds the PO number to Bakery", R.asksInvoice("Bakery", "po_number", bak) === true);
+// The add and edit forms test asksInv("delivery") before demanding delivery comments, so an
+// untick here also stops the comment being required. One predicate, both paths.
+t("an untick removes delivery from Bakery", R.asksInvoice("Bakery", "delivery", bak) === false);
+t("terms can be unticked", R.asksInvoice("Bakery", "terms", bak) === false);
+t("an untick on amount is ignored", R.asksInvoice("Bakery", "amount", bak) === true);
+t("a vendor-form row does not leak into the invoice form", R.asksInvoice("Bakery", "terms", bak) === false);
+t("Property Maintenance can drop the contractor block",
+  R.asksInvoice("Property Maintenance", "property_work", C.choicesFor(ROWS, "pm", "invoice")) === false);
+t("another department's rows change nothing for Bakery",
+  shapeOf("Bakery", C.choicesFor(ROWS, "pm", "invoice")) === shapeOf("Bakery"));
+const LOCKED = R.INVOICE_FIELDS.filter(f => f.locked);
+t("the locked invoice questions are number, date, amount, tax, freight, filing, due date and status",
+  LOCKED.map(f => f.key).sort().join(",") === "amount,due_date,filing,freight,invoice_date,invoice_number,status,tax");
+// Freight is part of what an invoice owes (invoiceTotal adds a saved freight whatever the
+// form shows), so the screen can neither hide it from a department that ships things nor
+// add it to Payrolls & Taxes. Its scope is the only answer.
+t("every locked question ignores a tick or an untick in every department",
+  LOCKED.every(f => Object.keys(MATRIX).every(d =>
+    R.asksInvoice(d, f.key, new Map([[f.key, false]])) === asks(d, f.key) &&
+    R.asksInvoice(d, f.key, new Map([[f.key, true]])) === asks(d, f.key))));
+t("an untick cannot hide freight from Bakery", R.asksInvoice("Bakery", "freight", new Map([["freight", false]])) === true);
+t("a tick cannot add freight to Payrolls & Taxes", R.asksInvoice("Payrolls & Taxes", "freight", new Map([["freight", true]])) === false);
+t("the unlocked invoice questions are delivery, PO number, property work and terms",
+  R.INVOICE_FIELDS.filter(f => !f.locked).map(f => f.key).sort().join(",") === "delivery,po_number,property_work,terms");
+
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);
