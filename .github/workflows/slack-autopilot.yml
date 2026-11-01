@@ -386,6 +386,15 @@ jobs:
             VERDICT: PASS        if you found no defect
             VERDICT: FINDINGS    if you found at least one
 
+      # claude-code-action writes every run to the same execution file, so the invariant
+      # review would overwrite this one and both verdicts would be the auditor's. Each review
+      # is copied to its own file the moment it ends; no copy reads as no verdict.
+      - name: Keep the money review
+        if: always() && steps.layout.outputs.ready == 'true'
+        env:
+          FILE: ${{ steps.money_review.outputs.execution_file }}
+        run: if [ -n "$FILE" ] && [ -f "$FILE" ]; then cp "$FILE" "$RUNNER_TEMP/money-review.json"; fi
+
       - name: Invariant review
         id: invariant_review
         if: steps.layout.outputs.ready == 'true'
@@ -416,14 +425,20 @@ jobs:
             VERDICT: PASS        if every invariant holds
             VERDICT: FINDINGS    if at least one is broken
 
+      - name: Keep the invariant review
+        if: always() && steps.layout.outputs.ready == 'true'
+        env:
+          FILE: ${{ steps.invariant_review.outputs.execution_file }}
+        run: if [ -n "$FILE" ] && [ -f "$FILE" ]; then cp "$FILE" "$RUNNER_TEMP/invariant-review.json"; fi
+
       # A tested script from this checkout (.github/scripts/autopilot-review.mjs). A reviewer
       # that errored, ran out of turns or gave no verdict line counts as not passed.
       - name: Weigh the reviews
         id: weigh
         if: always() && steps.layout.outputs.ready == 'true'
         env:
-          MONEY_FILE: ${{ steps.money_review.outputs.execution_file }}
-          INVARIANT_FILE: ${{ steps.invariant_review.outputs.execution_file }}
+          MONEY_FILE: ${{ runner.temp }}/money-review.json
+          INVARIANT_FILE: ${{ runner.temp }}/invariant-review.json
         run: node .github/scripts/autopilot-review.mjs weigh
 
   # The model wrote the code; this job decides how far it travels. Keeping the two apart is

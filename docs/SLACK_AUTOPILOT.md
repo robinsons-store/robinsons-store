@@ -3,13 +3,16 @@
 Type what you want in the store's requests channel. Within half an hour it comes back as a
 draft pull request, with a reply in the thread under your own message saying what happened.
 
-**State, 2026-10-30: switched on; the first request stopped at the model.** `SLACK_REQUEST_CHANNEL`
-was set that day to the workspace's general channel, where the bot is a member [V-run, `gh
-variable list`, 2026-10-30]. The first request, built from this branch's four-job workflow,
-was found, claimed and given its card in the thread, but the Anthropic API refused the build
-with "Credit balance is too low", so the card says stopped [V-run, Actions run 41127237310]. Nothing
-was pushed. Next: credit on the Anthropic account behind `ANTHROPIC_API_KEY`, then a new
-request (the stopped one carries ⚠️ and is skipped).
+**State, 2026-11-01: builds and reviews work; the pull request does not open.** Credit on the
+Anthropic account is fixed: on 2026-10-30 and 2026-11-01 a words-only request was found,
+built, reviewed by both reviewers and classified tier A, and its branch was pushed. Then
+`gh pr create` was refused with "GitHub Actions is not permitted to create or approve pull
+requests" [V-run, Actions runs 41142372330 and 41342129250]. The repository setting was
+switched on before the second run and the refusal did not change, so the organization's own
+setting (Organization settings, Actions, General, Workflow permissions) is the next thing to
+check; while the organization has it off, the repository's checkbox has no effect. Those
+runs also showed both reviewers' reports carrying the invariant auditor's text: the review
+job read one shared execution file for both. Fixed on branch claude/inspiring-curie-gwuu5j.
 
 This is the intake loop the Jira board used to be, moved to where the work is actually asked
 for. Nobody was writing to the board; people do write in Slack.
