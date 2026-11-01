@@ -75,10 +75,10 @@ export type TotalsCheck = {
   status: "match" | "mismatch" | "unchecked";
   against: "subtotal" | "total" | null;
   printed: number | null;
-  // The lines make the printed total as it stands: prices that include tax. The tax is
-  // inside the lines, so it must not be added on top, and the pre-tax goods are the lines
-  // less the tax at the rate.
-  taxIncluded: boolean;
+  // The lines make the printed total as it stands, on paper that prints no subtotal and no
+  // tax. Either the prices include tax or no tax was charged; the paper cannot say which. The
+  // lines are the total either way, so no tax may be added on top of them.
+  totalAsPrinted: boolean;
 };
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -102,18 +102,18 @@ export function checkTotals(
   const computed = round2(lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unit_cost) || 0), 0));
   const { printed_subtotal: sub, printed_hst: hst, printed_total: total } = printed;
   const near = (n: number) => Math.abs(computed - n) <= TOTALS_TOLERANCE + 1e-9;
-  if (sub !== null && near(sub)) return { computed, status: "match", against: "subtotal", printed: sub, taxIncluded: false };
-  if (!unreadable && sub === null && total === null) return { computed, status: "unchecked", against: null, printed: null, taxIncluded: false };
+  if (sub !== null && near(sub)) return { computed, status: "match", against: "subtotal", printed: sub, totalAsPrinted: false };
+  if (!unreadable && sub === null && total === null) return { computed, status: "unchecked", against: null, printed: null, totalAsPrinted: false };
   if (!unreadable && total !== null) {
     if (near(hst !== null ? total - hst : total / (1 + taxRate)))
-      return { computed, status: "match", against: "total", printed: total, taxIncluded: false };
+      return { computed, status: "match", against: "total", printed: total, totalAsPrinted: false };
     if (sub === null && hst === null && near(total))
-      return { computed, status: "match", against: "total", printed: total, taxIncluded: true };
+      return { computed, status: "match", against: "total", printed: total, totalAsPrinted: true };
   }
-  if (sub !== null) return { computed, status: "mismatch", against: "subtotal", printed: sub, taxIncluded: false };
+  if (sub !== null) return { computed, status: "mismatch", against: "subtotal", printed: sub, totalAsPrinted: false };
   return total !== null
-    ? { computed, status: "mismatch", against: "total", printed: total, taxIncluded: false }
-    : { computed, status: "mismatch", against: null, printed: null, taxIncluded: false };
+    ? { computed, status: "mismatch", against: "total", printed: total, totalAsPrinted: false }
+    : { computed, status: "mismatch", against: null, printed: null, totalAsPrinted: false };
 }
 
 // An invoice number is a short label, not a sentence. One with a dollar sign or an amount in

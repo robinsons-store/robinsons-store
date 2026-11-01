@@ -16,12 +16,12 @@ VERIFICATION.md):
   what the lines add up to. A printed figure that cannot be read as a number also needs the tick,
   unless the lines make the printed subtotal. Staff see that the lines do not add up, never the
   amounts. The tick is stored with the amber-line acknowledgement; no database change.
-- When the paper prints only a total and the lines make it as it stands (prices that include
-  tax), Capture labels the lines "tax included", shows the HST inside them instead of adding
-  13% on top, and checks the pre-tax part against the order. Before this, a $113.00
-  tax-included invoice showed a Total of $127.69 and a false "over the order" warning. On
-  paper that prints only a total, lines 13% too high read as tax-included the same way; the
-  label is what tells the person. Nothing saved changes: Capture stores no tax figure.
+- When the paper prints only a total and the lines make it as it stands, Capture shows the
+  Total as the lines and HST as "not printed", instead of adding 13% on top. Before this, a
+  $113.00 receipt showed a Total of $127.69. Such paper cannot say whether its prices include
+  tax or no tax was charged, so Capture does not guess: the order check compares the lines as
+  they are (a real overcharge is never hidden), and its warning gives the pre-tax figure in
+  case the prices include HST. Nothing saved changes: Capture stores no tax figure.
 - Expect the tick on the second half of a long invoice photographed in two parts: its printed
   total covers lines that are not in that photo, and the warning says so.
 - Capture's vendor match now ignores case, punctuation ("O'Reilly" is "OReilly"), "&" against "and", and a trailing Inc,

@@ -197,15 +197,15 @@ export default function Capture() {
   // edit, so retyping the misread line clears it. The acknowledgement is the amber-line one
   // (low_confidence_ack): both say a person checked lines the reader may have got wrong.
   const totalsCheck = draft && printed ? checkTotals(draft.line_items, printed, taxRate, printed.unreadable) : null;
-  const taxIncluded = totalsCheck?.taxIncluded === true;
+  const totalAsPrinted = totalsCheck?.totalAsPrinted === true;
 
-  // Totals. Money is dollars in the demo. Lines priced with the tax inside (taxIncluded) are
-  // already the total: the HST shown is the part of them that is tax, never added on top,
-  // and the pre-tax goods for the order check are the lines less that tax.
+  // Totals. Money is dollars in the demo. Lines that make a printed total with no tax printed
+  // (totalAsPrinted) are the total: the prices include tax or none was charged, so no HST is
+  // added and none is invented. The order check still compares the lines as they are, so a
+  // real overcharge is never hidden by guessing the prices include tax.
   const subtotal = draft ? round2(draft.line_items.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unit_cost) || 0), 0)) : 0;
-  const pretaxGoods = taxIncluded ? round2(subtotal / (1 + taxRate)) : subtotal;
-  const hst = taxIncluded ? round2(subtotal - pretaxGoods) : round2(subtotal * taxRate);
-  const total = taxIncluded ? subtotal : round2(subtotal + hst);
+  const hst = totalAsPrinted ? null : round2(subtotal * taxRate);
+  const total = hst === null ? subtotal : round2(subtotal + hst);
   const totalsMismatch = totalsCheck?.status === "mismatch";
   const totalsAck = totalsCheck !== null && totalsAckAt === totalsCheck.computed;
   const totalsDiff = totalsCheck && totalsCheck.printed !== null ? round2(totalsCheck.computed - totalsCheck.printed) : null;
@@ -215,7 +215,7 @@ export default function Capture() {
   const matchedVendor = draft ? matchVendor(vendors, deptId, draft.vendor) : undefined;
   const matchedPO = matchedVendor ? pos.find((p) => p.vendor_id === matchedVendor.id && p.order_amount != null) : undefined;
   const orderAmount = matchedPO?.order_amount ?? null;
-  const discrepancy = orderAmount != null ? round2(pretaxGoods - orderAmount) : null;
+  const discrepancy = orderAmount != null ? round2(subtotal - orderAmount) : null;
   // The order-vs-invoiced check compares dollar amounts, so it is only surfaced (and only
   // gates the save) for roles that can see money. Staff capture quantities and post.
   const hasDiscrepancy = showMoney && discrepancy != null && Math.abs(discrepancy) >= 0.01;
@@ -393,7 +393,7 @@ export default function Capture() {
             <div className="card" style={{ padding: 12, background: "var(--warning-tint)", borderColor: "var(--warning-base)" }}>
               <span className="chip chip-warning">&#9888; Order vs invoiced</span>
               <p className="help" style={{ marginTop: 8, color: "var(--text-primary)" }}>
-                Ordered {formatCAD(orderAmount)} vs invoiced {formatCAD(pretaxGoods)} (pre-tax).{" "}
+                Ordered {formatCAD(orderAmount)} vs invoiced {formatCAD(subtotal)} ({totalAsPrinted ? `the invoice prints no tax; if its prices include HST, the pre-tax amount is ${formatCAD(round2(subtotal / (1 + taxRate)))}` : "pre-tax"}).{" "}
                 {discrepancy! < 0
                   ? `Short by ${formatCAD(Math.abs(discrepancy!))}. Check for missing items.`
                   : `Over by ${formatCAD(discrepancy!)}. Check for extra or unordered items.`}
@@ -461,14 +461,14 @@ export default function Capture() {
 
           {showMoney && (
             <div style={{ maxWidth: 280, marginLeft: "auto", width: "100%" }}>
-              <div className="totals-row"><span className="help">{taxIncluded ? "Lines (tax included)" : "Subtotal"}</span><span className="tabular">{formatCAD(subtotal)}</span></div>
+              <div className="totals-row"><span className="help">{totalAsPrinted ? "Lines" : "Subtotal"}</span><span className="tabular">{formatCAD(subtotal)}</span></div>
               {totalsCheck && totalsCheck.printed !== null && (
                 <div className="totals-row">
                   <span className="help">{totalsCheck.against === "subtotal" ? "Invoice subtotal" : "Invoice total"}</span>
                   <span className="tabular" style={totalsMismatch ? { color: "var(--warning-base)", fontWeight: 600 } : undefined}>{formatCAD(totalsCheck.printed)}</span>
                 </div>
               )}
-              <div className="totals-row"><span className="help">HST ({Math.round(taxRate * 100)}%{taxIncluded ? ", included" : ""})</span><span className="tabular">{formatCAD(hst)}</span></div>
+              <div className="totals-row"><span className="help">HST{hst === null ? "" : ` (${Math.round(taxRate * 100)}%)`}</span><span className="tabular">{hst === null ? "not printed" : formatCAD(hst)}</span></div>
               <div className="totals-row total"><span>Total</span><span className="tabular">{formatCAD(total)}</span></div>
             </div>
           )}
