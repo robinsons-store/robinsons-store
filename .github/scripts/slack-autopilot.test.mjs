@@ -155,6 +155,19 @@ t("review: two reviewers", reviewers.length === 2, `${reviewers.length}`);
 for (const s of reviewers) {
   t(`review, ${s.name}: reads only`, /--allowedTools "Read,Grep,Glob"/.test(s.text));
 }
+// claude-code-action reuses one execution file per runner, so each review is copied to its
+// own file straight after it runs, before the next one can overwrite it.
+const weighStep = review.steps.find((s) => s.id === "weigh");
+for (const [key, id] of [["money", "money_review"], ["invariant", "invariant_review"]]) {
+  const at = review.steps.findIndex((s) => s.id === id);
+  const keep = review.steps[at + 1];
+  t(`review: the ${key} review is copied to its own file straight after it runs`,
+    !!keep && keep.text.includes(`steps.${id}.outputs.execution_file`) && keep.text.includes(`$RUNNER_TEMP/${key}-review.json`)
+      && /always\(\)/.test(keep.if));
+  t(`review: the weigh step reads the ${key} copy, not the shared execution file`,
+    (weighStep?.text || "").includes(`${key.toUpperCase()}_FILE: \${{ runner.temp }}/${key}-review.json`));
+}
+t("review: the weigh step never reads an execution file directly", !/execution_file/.test(weighStep?.text || ""));
 
 // Who holds which secret, across the whole workflow.
 for (const s of allSteps.filter(holdsSlack)) {
