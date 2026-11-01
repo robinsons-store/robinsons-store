@@ -57,6 +57,7 @@ jobs:
           git fetch origin main develop --quiet
           export MAIN_AHEAD=$(git rev-list --count origin/develop..origin/main)
           echo "Commits on main that develop lacks: $MAIN_AHEAD."
+          echo "sha=$(git rev-parse origin/main)" >> "$GITHUB_OUTPUT"
           node .github/scripts/branch-flow.mjs sync
           CHANGED_FILES=$(git diff --name-only origin/develop...origin/main) node .github/scripts/branch-flow.mjs database
 
@@ -65,11 +66,27 @@ jobs:
         if: steps.need.outputs.action == 'open'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ steps.need.outputs.sha }}
         run: |
           set -euo pipefail
-          existing=$(gh pr list --head main --base develop --state open --json number --jq '.[0].number' || echo "")
+          # Only this repository's main, at the exact commit read above. --head main alone
+          # also matches a fork's branch named main, and this step merges what it picks.
+          pick() {
+            gh pr list --repo "$GITHUB_REPOSITORY" --head main --base develop --state open \
+              --json number,isCrossRepository,headRefOid \
+              --jq "[.[] | select(.isCrossRepository == false and .headRefOid == \"$SHA\")][0].number // empty"
+          }
+          existing=$(pick || echo "")
           if [ -n "$existing" ]; then
             echo "number=$existing" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # One already open from this repository but on a newer main: the run that newer
+          # commit started handles it.
+          open_same=$(gh pr list --repo "$GITHUB_REPOSITORY" --head main --base develop --state open \
+            --json isCrossRepository --jq '[.[] | select(.isCrossRepository == false)] | length')
+          if [ "$open_same" != "0" ]; then
+            echo "A main to develop pull request is open on a newer main; leaving it to that run."
             exit 0
           fi
           if ! gh pr create --base develop --head main --title "Bring develop level with main" \
@@ -78,7 +95,8 @@ jobs:
             echo "Settings, Actions, General, 'Allow GitHub Actions to create and approve pull requests'."
             exit 1
           fi
-          echo "number=$(gh pr list --head main --base develop --state open --json number --jq '.[0].number')" >> "$GITHUB_OUTPUT"
+          # Empty if main moved since it was read; the next run picks the newer commit up.
+          echo "number=$(pick || echo "")" >> "$GITHUB_OUTPUT"
 
       - name: Merge it when it merges cleanly
         id: merge
@@ -86,6 +104,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           N: ${{ steps.pr.outputs.number }}
+          SHA: ${{ steps.need.outputs.sha }}
         run: |
           # GitHub works out mergeability a moment after the pull request opens.
           for i in 1 2 3 4 5 6; do
@@ -99,7 +118,19 @@ jobs:
             echo "merged=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          gh pr merge "$N" --merge
+          # Read it again just before merging: still open, still this repository's main into
+          # develop, still on the commit read above. The merge is pinned to that commit, so a
+          # newer head makes GitHub refuse rather than merge something unchecked.
+          now=$(gh pr view "$N" --repo "$GITHUB_REPOSITORY" \
+            --json state,baseRefName,headRefName,isCrossRepository,headRefOid \
+            --jq '"\(.state) \(.baseRefName) \(.headRefName) \(.isCrossRepository) \(.headRefOid)"')
+          if [ "$now" != "OPEN develop main false $SHA" ]; then
+            echo "::warning::Pull request #$N is not this repository's main at $SHA (now: $now). Not merged."
+            echo "merged=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Never --delete-branch: the head is main.
+          gh pr merge "$N" --repo "$GITHUB_REPOSITORY" --merge --match-head-commit "$SHA"
           echo "merged=true" >> "$GITHUB_OUTPUT"
 
       - name: Start what a person's merge would have started
