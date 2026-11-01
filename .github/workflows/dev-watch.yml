@@ -1,0 +1,51 @@
+name: Dev site watch
+
+# Asks the dev site's /api/health after every CI run on develop, so a change that breaks the
+# dev site shows as a red run the moment it lands there, not when somebody next opens it.
+#
+# Separate from the post-deploy watch on purpose: that one's Slack alerts read its own run
+# history to decide whether the live site changed state, and dev runs mixed in would make it
+# announce outages and recoveries that never happened. This one posts nothing. A broken dev
+# site matters at promotion, and promotion already refuses an unhealthy dev site.
+#
+# Needs the DEV_URL variable and, because the dev site is behind Vercel's login wall, the
+# VERCEL_AUTOMATION_BYPASS_SECRET secret. Without DEV_URL it says so and passes.
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [develop]
+  workflow_dispatch:
+
+concurrency:
+  group: dev-watch
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Give the deploy a moment to go live
+        if: github.event_name == 'workflow_run'
+        run: sleep 90
+
+      - name: Ask the dev site how it is
+        id: health
+        env:
+          SITE: ${{ vars.DEV_URL }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: node .github/scripts/health-check.mjs
+
+      - name: Fail the run so it is visible
+        if: steps.health.outputs.healthy == 'false'
+        run: |
+          echo "The dev site reported a problem:"
+          echo "${{ steps.health.outputs.summary }}"
+          exit 1
