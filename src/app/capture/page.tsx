@@ -40,6 +40,9 @@ export default function Capture() {
   const [manual, setManual] = useState(false);
   const [ack, setAck] = useState(false);
   const [lowAck, setLowAck] = useState(false);
+  // Why the reader sent every line to amber at once (the lines do not add up to the printed
+  // subtotal). Shown to money roles only: it is about dollar figures.
+  const [readReason, setReadReason] = useState<string | null>(null);
 
   const [extracting, setExtracting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -96,6 +99,7 @@ export default function Capture() {
     setManual(false);
     setAck(false);
     setLowAck(false);
+    setReadReason(null);
     setReduced(null);
     setFile(f);
     if (preview) URL.revokeObjectURL(preview);
@@ -113,6 +117,7 @@ export default function Capture() {
     setPreview(null);
     setAck(false);
     setLowAck(false);
+    setReadReason(null);
     setManual(true);
     setDraft({ vendor: "", invoice_date: "", notes: "", line_items: [{ description: "", qty: null, unit_cost: null, retail_price_note: null, confidence: 1 }] });
   }
@@ -132,10 +137,13 @@ export default function Capture() {
         headers: { "content-type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({ imageBase64: prepared.base64, mediaType: prepared.mediaType, store_id: storeId })
       });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || "extraction failed");
+      // A function the platform killed answers with a page, not JSON; that is a failed read
+      // with plain words, never a parse error on screen.
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(typeof data.error === "string" ? data.error : "The invoice could not be read just now. You can use Enter manually.");
       setAck(false);
       setLowAck(false);
+      setReadReason(typeof data.reason === "string" ? data.reason : null);
       setDraft({
         vendor: data.vendor || "",
         invoice_date: data.invoice_date || "",
@@ -253,6 +261,7 @@ export default function Capture() {
       setPreview(null);
       setAck(false);
       setLowAck(false);
+      setReadReason(null);
       setTimeout(() => router.push("/"), 900);
     } catch (e: any) {
       setError(e.message);
@@ -380,6 +389,7 @@ export default function Capture() {
               <span className="chip chip-warning">&#9888; Uncertain fields</span>
               <p className="help" style={{ marginTop: 8, color: "var(--text-primary)" }}>
                 {lowLines === 1 ? "1 line was" : `${lowLines} lines were`} read with low confidence and {lowLines === 1 ? "is" : "are"} shown in amber.{" "}
+                {showMoney && readReason ? `${readReason} ` : ""}
                 {showMoney
                   ? "Retyping the unit cost clears a line. Tick the box once you have checked the rest."
                   : "Amber lines are saved without a cost, for the owner to enter. Check the description and qty, then tick the box."}

@@ -8,10 +8,12 @@
 import type { LineItem } from "@/lib/types";
 
 // Applies one edit to a line. Confidence goes to 1 only when the patch carries a typed unit
-// cost that is a real number. Emptying the box (null) or typing something that is not a
-// number (NaN) leaves the line amber, so it cannot save a blank cost that looks checked.
+// cost that is a real number above 0. Emptying the box (null), typing something that is not a
+// number (NaN), or typing 0 or less leaves the line amber, so it cannot save a blank or $0 cost
+// that looks checked; 0 is the reader's own word for a cost it could not read, as in costEntry.
+// A cost that really is 0 still saves through the "I checked every amber line" box.
 export function editLine(line: LineItem, patch: Partial<LineItem>): LineItem {
-  const retypedCost = typeof patch.unit_cost === "number" && Number.isFinite(patch.unit_cost);
+  const retypedCost = typeof patch.unit_cost === "number" && Number.isFinite(patch.unit_cost) && patch.unit_cost > 0;
   return { ...line, ...patch, ...(retypedCost ? { confidence: 1 } : {}) };
 }
 

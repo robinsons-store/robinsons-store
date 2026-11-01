@@ -4,11 +4,17 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "esModuleInterop": true,
+    "strict": true,
     "skipLibCheck": true,
     "outDir": "out",
     "baseUrl": "../..",
     "paths": { "@/*": ["src/*"] },
-    "lib": ["es2020"]
+    "lib": ["es2020", "dom", "dom.iterable"]
   },
-  "include": ["../../src/lib/extractValidate.ts", "../../src/lib/captureLines.ts"]
+  "include": [
+    "../../src/lib/extractValidate.ts",
+    "../../src/lib/captureLines.ts",
+    "../../src/lib/anthropic.ts",
+    "../../src/lib/aiUsage.ts"
+  ]
 }

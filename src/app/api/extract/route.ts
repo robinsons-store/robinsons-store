@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveMember } from "@/lib/serverMember";
 import { callClaude, claudeConfigured, failureMessage } from "@/lib/anthropic";
-import { normalizeExtraction, EXTRACT_MEDIA_TYPES, EXTRACT_MAX_BASE64 } from "@/lib/extractValidate";
+import { extractReply, EXTRACT_MEDIA_TYPES, EXTRACT_MAX_BASE64 } from "@/lib/extractValidate";
 
 export const runtime = "nodejs";
-// Run in Montreal, not the default iad1 (Washington DC). The Supabase project is in
-// Toronto, so this keeps the store's vendor, payment and staff data being processed in
-// Canada rather than crossing the border on every request, and it is the nearest region
-// to the database, which Vercel recommends for latency.
+// Run in Montreal, not the default iad1 (Washington DC), the nearest region to the Toronto
+// database, which Vercel recommends for latency. The function and its database work run in
+// Canada; the invoice image itself still goes to the Anthropic API, which is in the US.
 export const preferredRegion = "yul1";
 // Long enough for a multi-page invoice read plus one retry; the client times out at 45s.
 export const maxDuration = 60;
@@ -27,9 +26,10 @@ Return ONLY a JSON object, no prose and no code fences, in exactly this shape:
       "retail_price_note": number or null,
       "confidence": number between 0 and 1
     }
-  ]
+  ],
+  "printed_subtotal": number or null
 }
-Rules: amounts are in CAD as plain numbers with no currency symbol. retail_price_note is the retail price written by hand next to a line, or null if none. confidence is between 0 and 1; set it low on any field you are unsure about. If a value is missing use 0 for numbers and an empty string for text.`;
+Rules: amounts are in CAD as plain numbers with no currency symbol. retail_price_note is the retail price written by hand next to a line, or null if none. confidence is between 0 and 1; set it low on any field you are unsure about. If a value is missing use 0 for numbers and an empty string for text. printed_subtotal is the subtotal of the goods lines exactly as printed, before tax, freight, deposits, fees and discounts; use null, never 0, if the invoice prints no such figure or its only subtotal already includes any of those. Copy it, never add it up yourself.`;
 
 // The same contract as the prompt, enforced by the API instead of asked for politely.
 // Structured outputs constrain the response to this schema, so "the model wrapped it in a
@@ -60,9 +60,10 @@ const OUTPUT_SCHEMA = {
         required: ["description", "qty", "unit_cost", "retail_price_note", "confidence"],
         additionalProperties: false
       }
-    }
+    },
+    printed_subtotal: { anyOf: [{ type: "number" }, { type: "null" }] }
   },
-  required: ["vendor", "invoice_date", "notes", "line_items"],
+  required: ["vendor", "invoice_date", "notes", "line_items", "printed_subtotal"],
   additionalProperties: false
 } as const;
 
@@ -90,7 +91,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!claudeConfigured()) {
-      return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set" }, { status: 500 });
+      return NextResponse.json({ error: `${failureMessage("no_key")} You can also use Enter manually.` }, { status: 500 });
     }
 
     const block =
@@ -110,44 +111,10 @@ export async function POST(req: NextRequest) {
       timeoutMs: 45000
     });
 
-    if (!result.ok) {
-      // A refusal and a cut-off get their own words because each points at a different fix
-      // for the person holding the invoice: a seasonal employee at the receiving door, who
-      // is never asked to debug. Tell them what to do next instead.
-      if (result.kind === "refusal") {
-        return NextResponse.json(
-          { error: "The reader would not process this document. Enter the invoice by hand using Enter manually, and tell the owner which invoice it was." },
-          { status: 422 }
-        );
-      }
-      // Ran out of room. The invoice was read fine, there were just more lines than would
-      // fit, and saying so points at the real fix (capture it in two photos).
-      if (result.kind === "max_tokens") {
-        return NextResponse.json(
-          { error: "This invoice is longer than the reader can return in one go. Photograph it in two halves and capture each, or enter it by hand." },
-          { status: 422 }
-        );
-      }
-      return NextResponse.json({ error: `${failureMessage(result.kind)} You can also use Enter manually.` }, { status: result.kind === "capped" ? 429 : 502 });
-    }
-
-    // Structured outputs should make the fence strip unnecessary, since the response is
-    // constrained to the schema. It stays because it costs nothing and this is the path a
-    // failed capture blocks the receiving door on.
-    const raw = result.text.replace(/```json|```/g, "").trim();
-
-    let parsed: any;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      console.warn(JSON.stringify({ ai_call: "extract", outcome: "unparseable", chars: raw.length }));
-      return NextResponse.json({ error: "The reader returned something unreadable. Try the photo again, or use Enter manually." }, { status: 502 });
-    }
-
-    const { data, warnings } = normalizeExtraction(parsed);
-    if (warnings.length) console.warn(JSON.stringify({ ai_call: "extract", outcome: "coerced", warnings }));
-    return NextResponse.json({ ...data, warnings, model: result.model });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || "unexpected error" }, { status: 500 });
+    const reply = extractReply(result);
+    return NextResponse.json(reply.body, { status: reply.status });
+  } catch {
+    // Fixed words: a thrown message can carry provider or database text.
+    return NextResponse.json({ error: "The invoice could not be read just now. Try again, or use Enter manually." }, { status: 500 });
   }
 }
