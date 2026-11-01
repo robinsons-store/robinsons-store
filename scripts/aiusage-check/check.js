@@ -196,6 +196,83 @@ const call = (scope, extra = {}) => callClaude({ route: "ask", max_tokens: 100, 
   t("body timed out mid-download: timeout, row finished", !r.ok && r.kind === "timeout" && db.finishes[0]?.p_failure_kind === "timeout");
   responder = () => ok();
 
+  // Retries, the deadline and Retry-After, with sleep injected so no case waits for real.
+  const slept = [];
+  const fakeSleep = async (ms) => { slept.push(ms); };
+  const busy = (status, headers = {}) => new Response(JSON.stringify({ type: "error", error: { type: "overloaded_error", message: "busy" } }), { status, headers: { "content-type": "application/json", ...headers } });
+  let queue = [];
+  const inOrder = (...rs) => { queue = rs; return () => (queue.shift() || ok)(); };
+
+  fetchCalls = 0;
+  responder = inOrder(() => busy(529), ok);
+  r = await call(null, { sleep: fakeSleep });
+  t("529 then 200: answered after 2 fetches", r.ok && fetchCalls === 2);
+  fetchCalls = 0;
+  responder = () => busy(529);
+  r = await call(null, { sleep: fakeSleep });
+  t("529 three times: overloaded after 3 fetches", !r.ok && r.kind === "overloaded" && fetchCalls === 3);
+
+  // The request body: never a sampling parameter (current models reject them), and only the
+  // keys the client means to send.
+  let sentBody = null;
+  responder = (init) => ((sentBody = JSON.parse(init.body)), ok());
+  await call(null, { system: "Be brief.", output_config: { format: { type: "json_schema", schema: {} } } });
+  const bodyKeys = Object.keys(sentBody || {}).sort().join(",");
+  t("request body has no temperature, top_p or top_k", sentBody && !("temperature" in sentBody) && !("top_p" in sentBody) && !("top_k" in sentBody));
+  t("request body carries exactly the known keys", bodyKeys === "max_tokens,messages,model,output_config,system", bodyKeys);
+
+  // A 503 at 200 ms with a 300 ms deadline: no time for a useful retry, so one attempt, and
+  // the call is over before the deadline.
+  fetchCalls = 0;
+  responder = () => sleep(200).then(() => busy(503));
+  let t0 = Date.now();
+  r = await call(null, { deadline: t0 + 300, timeoutMs: 45000 });
+  let took = Date.now() - t0;
+  t("300 ms deadline, 503 at 200 ms: one attempt, back before the deadline", !r.ok && fetchCalls === 1 && took < 300, `${took} ms`);
+  // A hung API: the attempt's own 45 s limit is cut to what is left of the deadline.
+  responder = (init) => new Promise((_res, rej) => init.signal.addEventListener("abort", () => rej(init.signal.reason)));
+  t0 = Date.now();
+  r = await call(null, { deadline: t0 + 300, timeoutMs: 45000 });
+  took = Date.now() - t0;
+  t("hung API: attempt cut to the deadline, kind timeout", !r.ok && r.kind === "timeout" && took < 1000, `${took} ms`);
+  // Out of time before the first attempt (say a hung database ate it): no call at all.
+  fetchCalls = 0;
+  r = await call(null, { deadline: Date.now() - 1 });
+  t("deadline already passed: no fetch, kind timeout", !r.ok && r.kind === "timeout" && fetchCalls === 0);
+
+  // Retry-After: wait what the API asks, when it fits; otherwise give up at once.
+  slept.length = 0;
+  fetchCalls = 0;
+  responder = inOrder(() => busy(429, { "retry-after": "2" }), ok);
+  r = await call(null, { sleep: fakeSleep });
+  t("429 retry-after 2: waits at least 2 s, then answers", r.ok && fetchCalls === 2 && slept[0] >= 2000, `slept ${slept.join(",")}`);
+  slept.length = 0;
+  responder = inOrder(() => busy(529, { "retry-after": "0" }), ok);
+  r = await call(null, { sleep: fakeSleep });
+  t("retry-after 0 keeps the backoff", r.ok && slept[0] === 500, `slept ${slept.join(",")}`);
+  slept.length = 0;
+  fetchCalls = 0;
+  responder = () => busy(429, { "retry-after": "30" });
+  r = await call(null, { sleep: fakeSleep, deadline: Date.now() + 20000 });
+  t("retry-after longer than the time left: overloaded at once, no wait", !r.ok && r.kind === "overloaded" && fetchCalls === 1 && slept.length === 0);
+
+  // An HTML page with a 200 (a proxy or an outage page): fixed words, no parser text.
+  logged.length = 0;
+  fetchCalls = 0;
+  responder = () => new Response("<html><body>Bad gateway</body></html>", { status: 200, headers: { "content-type": "text/html" } });
+  r = await call(null);
+  const shown = r.ok ? "" : failureMessage(r.kind);
+  t("HTML 200: kind upstream, one fetch", !r.ok && r.kind === "upstream" && fetchCalls === 1);
+  t("HTML 200: no SyntaxError text in the result, the words or the log", !/Unexpected token|SyntaxError|JSON at position/.test(JSON.stringify(r) + shown + logged.join("")), shown);
+
+  // A model name the API does not know: a setting to fix, not a retry.
+  fetchCalls = 0;
+  responder = () => new Response(JSON.stringify({ type: "error", error: { type: "not_found_error", message: "model: claude-sonet-5" } }), { status: 404 });
+  r = await call(null, { sleep: fakeSleep });
+  t("404 model error: kind config after one fetch", !r.ok && r.kind === "config" && fetchCalls === 1);
+  t("config words point at the model setting", /model setting/.test(failureMessage("config")) && !failureMessage("config").includes(String.fromCharCode(0x2014)));
+  responder = () => ok();
+
   // No store, or no key: nothing reserved, nothing finished.
   db = fakeDb({ used: 1000 });
   fetchCalls = 0;

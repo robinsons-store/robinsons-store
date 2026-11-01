@@ -21,7 +21,8 @@ export type ClaudeFailure =
   | "max_tokens"
   | "bad_request"
   | "upstream"
-  | "capped";
+  | "capped"
+  | "config";
 
 export type ClaudeResult =
   | {
@@ -35,6 +36,8 @@ export type ClaudeResult =
   | { ok: false; kind: ClaudeFailure; detail: string; model: string; ms: number };
 
 type CallOptions = {
+  // Names the call in the logs and the ai_call row. What each route sends, and where, is in
+  // docs/PLATFORM.md ("What leaves Canada"); a new route adds its row there.
   route: string;
   // A string, or text blocks when part of it carries cache_control (see /api/ask).
   system?: string | unknown[];
@@ -46,12 +49,24 @@ type CallOptions = {
   // (src/lib/aiUsage.ts). Required so a route cannot drop it without tsc noticing; null,
   // the call is neither logged nor capped.
   scope: AiUsageScope | null;
+  // When the reservation, every attempt and every retry must be over (epoch ms). Writing the
+  // usage row afterwards has its own 1.5 second limit (aiUsage.ts). A route that does work
+  // before the call can pass its request start plus its budget; otherwise it is
+  // DEFAULT_DEADLINE_MS from entry, under the 60 second maxDuration with room for the route.
+  deadline?: number;
+  // Test seams: fake timers do not drive AbortSignal.timeout, so the check injects these.
+  sleep?: (ms: number) => Promise<void>;
+  now?: () => number;
 };
 
 // 429 is rate limited, 529 is overloaded, the 5xx are transient on the API side. A 400 or
 // 401 will fail the same way every time, so retrying it only makes the person wait longer.
 const RETRYABLE = new Set([429, 500, 502, 503, 504, 529]);
 const BACKOFF_MS = [500, 1500];
+export const DEFAULT_DEADLINE_MS = 50_000;
+// Not worth starting an attempt with less than this left: a real answer takes longer, and a
+// call cut off by the platform reaches the screen as a page instead of plain words.
+const MIN_ATTEMPT_MS = 8_000;
 
 export function claudeModel(): string {
   return process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
@@ -61,9 +76,22 @@ export function claudeConfigured(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY);
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms + Math.floor(Math.random() * 250)));
+const jitterSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms + Math.floor(Math.random() * 250)));
+
+// retry-after is seconds or an HTTP date. Unreadable or absent is 0, which leaves the backoff.
+function retryAfterMs(resp: Response, now: number): number {
+  const v = resp.headers?.get?.("retry-after");
+  if (!v) return 0;
+  const secs = Number(v);
+  if (Number.isFinite(secs)) return Math.max(0, secs * 1000);
+  const at = Date.parse(v);
+  return Number.isFinite(at) ? Math.max(0, at - now) : 0;
+}
 
 export async function callClaude(opts: CallOptions): Promise<ClaudeResult> {
+  const now = opts.now ?? Date.now;
+  const sleep = opts.sleep ?? jitterSleep;
+  const deadline = opts.deadline ?? now() + DEFAULT_DEADLINE_MS;
   const model = claudeModel();
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { ok: false, kind: "no_key", detail: "ANTHROPIC_API_KEY is not set", model, ms: 0 };
@@ -74,7 +102,7 @@ export async function callClaude(opts: CallOptions): Promise<ClaudeResult> {
     return capped;
   }
   // Started after the reservation, so ms is the model's time and not the database's.
-  const started = Date.now();
+  const started = now();
 
   const body = JSON.stringify({
     model,
@@ -84,9 +112,18 @@ export async function callClaude(opts: CallOptions): Promise<ClaudeResult> {
     messages: opts.messages
   });
 
-  let last: { kind: ClaudeFailure; detail: string } = { kind: "upstream", detail: "no attempt made" };
+  let last: { kind: ClaudeFailure; detail: string } = { kind: "timeout", detail: "no time left to call" };
+  // How long to wait before the next attempt; set by the failure that asked for a retry.
+  let wait = 0;
   for (let attempt = 0; attempt <= BACKOFF_MS.length; attempt++) {
-    if (attempt > 0) await sleep(BACKOFF_MS[attempt - 1]);
+    if (attempt > 0) {
+      // A retry only when the wait and a useful attempt both fit before the deadline.
+      if (deadline - now() - wait < MIN_ATTEMPT_MS) break;
+      await sleep(wait);
+    }
+    const left = deadline - now();
+    if (left <= 0) break;
+    const attemptMs = Math.min(opts.timeoutMs ?? 25000, left);
     let resp: Response;
     try {
       resp = await fetch("https://api.anthropic.com/v1/messages", {
@@ -97,26 +134,35 @@ export async function callClaude(opts: CallOptions): Promise<ClaudeResult> {
           "anthropic-version": "2023-06-01"
         },
         body,
-        signal: AbortSignal.timeout(opts.timeoutMs ?? 25000)
+        signal: AbortSignal.timeout(attemptMs)
       });
     } catch (err: any) {
       // A timeout is not retried: the person has already waited the whole budget, and a
       // second full wait would outlast the function's maxDuration anyway.
       if (err?.name === "TimeoutError" || err?.name === "AbortError") {
-        last = { kind: "timeout", detail: `no answer within ${opts.timeoutMs ?? 25000} ms` };
+        last = { kind: "timeout", detail: `no answer within ${attemptMs} ms` };
         break;
       }
       last = { kind: "upstream", detail: String(err?.message || err).slice(0, 300) };
+      wait = BACKOFF_MS[attempt] ?? 0;
       continue;
     }
 
     if (!resp.ok) {
       const detail = (await resp.text().catch(() => "")).slice(0, 300);
       if (RETRYABLE.has(resp.status)) {
-        last = { kind: resp.status === 429 || resp.status === 529 ? "overloaded" : "upstream", detail: `${resp.status} ${detail}` };
+        const busy = resp.status === 429 || resp.status === 529;
+        last = { kind: busy ? "overloaded" : "upstream", detail: `${resp.status} ${detail}` };
+        // The API says how long to stay away; waiting less only earns another refusal.
+        wait = Math.max(BACKOFF_MS[attempt] ?? 0, busy ? retryAfterMs(resp, now()) : 0);
         continue;
       }
-      last = { kind: "bad_request", detail: `${resp.status} ${detail}` };
+      // A 404 not_found_error is a model name the API does not know: a setting to fix, not a
+      // moment to try again. No allow-list here, so ANTHROPIC_MODEL stays changeable.
+      last = {
+        kind: resp.status === 404 && detail.includes("not_found_error") ? "config" : "bad_request",
+        detail: `${resp.status} ${detail}`
+      };
       break;
     }
 
@@ -133,7 +179,7 @@ export async function callClaude(opts: CallOptions): Promise<ClaudeResult> {
           : { kind: "upstream", detail: "answer was not JSON" };
       break;
     }
-    const ms = Date.now() - started;
+    const ms = now() - started;
     // A refusal and a cut-off both arrive as HTTP 200, so they have to be read from
     // stop_reason rather than the status code.
     const textPart = (data.content || []).find((c: any) => c.type === "text");
@@ -153,7 +199,7 @@ export async function callClaude(opts: CallOptions): Promise<ClaudeResult> {
     return result;
   }
 
-  const failed: ClaudeResult = { ok: false, ...last, model, ms: Date.now() - started };
+  const failed: ClaudeResult = { ok: false, ...last, model, ms: now() - started };
   logCall(opts.route, failed);
   await finishAiCall(opts.scope, slot.id, opts.route, failed, null);
   return failed;
@@ -183,6 +229,8 @@ export function failureMessage(kind: ClaudeFailure): string {
       return "The AI helper would not answer this one. Try rewording it, or tell the owner.";
     case "max_tokens":
       return "The answer was too long to finish. Ask a narrower question.";
+    case "config":
+      return "The AI helper is set up wrong. Tell the owner to check the AI model setting.";
     case "capped":
       return "The AI helper has used today's limit for this store and starts again tomorrow. If it is needed sooner, the owner can raise the limit in Vercel and redeploy.";
     case "bad_request":
