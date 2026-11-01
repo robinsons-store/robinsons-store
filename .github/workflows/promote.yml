@@ -13,6 +13,9 @@ name: Promote develop to production
 # This only answers "has a person said yes", which is the one question a machine must never
 # answer for itself.
 #
+# It also refuses unless the dev site at DEV_URL answers healthy (rule and tests in
+# .github/scripts/branch-flow.mjs).
+#
 # Inert until a develop branch exists, so it is safe to merge before the dev site is set up.
 
 on:
@@ -63,6 +66,24 @@ jobs:
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
+
+      # Promotion means "it was tried on the dev site", so the dev site has to be up and agree
+      # with its own database. An unset DEV_URL refuses: then nothing was tried there. The dev
+      # site is behind Vercel's login wall, so the bypass secret is what lets this ask it.
+      - name: Ask the dev site how it is
+        id: dev
+        if: steps.ahead.outputs.ready == 'true'
+        env:
+          SITE: ${{ vars.DEV_URL }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: node .github/scripts/health-check.mjs
+
+      - name: Refuse unless the dev site is healthy
+        if: steps.ahead.outputs.ready == 'true'
+        env:
+          DEV_CHECKED: ${{ steps.dev.outputs.checked }}
+          DEV_HEALTHY: ${{ steps.dev.outputs.healthy }}
+        run: node .github/scripts/branch-flow.mjs devgate
 
       - name: Open or reuse the promotion pull request
         id: pr
@@ -166,6 +187,11 @@ jobs:
           gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --merge --match-head-commit "$SHA" \
             || hold "GitHub refused the merge (branch protection or a newer commit)."
           echo "Pull request #$PR merged at $SHA after CI passed on that commit (run $run)."
+
+          # The merge commit is now on main and not on develop, and the next promotion needs
+          # main inside develop. Carry it back now rather than at the sync's next schedule.
+          gh workflow run sync-develop.yml --repo "$GITHUB_REPOSITORY" --ref main \
+            || echo "::warning::Could not start Bring develop level with main; its schedule will."
 
           # The merge was made with GITHUB_TOKEN too, so the push to main may start no workflow.
           # Ask for the two a push to main would have started. If GitHub does start them as
