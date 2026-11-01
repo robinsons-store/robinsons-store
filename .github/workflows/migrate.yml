@@ -74,9 +74,15 @@ jobs:
       - name: Check the connection secret is set
         id: gate
         env:
-          PGCONN: ${{ github.ref_name == 'develop' && secrets.SUPABASE_DB_URL_DEV || secrets.SUPABASE_DB_URL }}
+          # Both strings, and the choice made in the shell. Written as
+          # "develop && DEV || PROD", an EMPTY dev secret falls through to the production
+          # string, and a push to develop would apply its scripts to the store's ledger with
+          # the guard below waving it through (no dev string to compare). Found 2026-10-30.
+          DEV_CONN: ${{ secrets.SUPABASE_DB_URL_DEV }}
+          PROD_CONN: ${{ secrets.SUPABASE_DB_URL }}
           WHICH: ${{ steps.env.outputs.name }}
         run: |
+          if [ "$WHICH" = "dev" ]; then PGCONN="$DEV_CONN"; else PGCONN="$PROD_CONN"; fi
           # The length, never the value. A length of 0 means the job cannot see the secret,
           # which is a settings problem rather than anything in this file, and printing it
           # turns "skipped" from a mystery into a measurement. It is how a secret that had
@@ -108,11 +114,15 @@ jobs:
       - name: Apply the scripts in order
         if: steps.gate.outputs.ready == 'true'
         env:
-          PGCONN: ${{ github.ref_name == 'develop' && secrets.SUPABASE_DB_URL_DEV || secrets.SUPABASE_DB_URL }}
+          DEV_CONN: ${{ secrets.SUPABASE_DB_URL_DEV }}
+          PROD_CONN: ${{ secrets.SUPABASE_DB_URL }}
           WHICH: ${{ steps.env.outputs.name }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
+          # Chosen here for the reason given at the gate: never fall through to production.
+          if [ "$WHICH" = "dev" ]; then PGCONN="$DEV_CONN"; else PGCONN="$PROD_CONN"; fi
+          if [ -z "$PGCONN" ]; then echo "::error::No connection string for $WHICH."; exit 1; fi
 
           # A direct connection resolves only over IPv6 on Supabase projects created since
           # early 2024, and a GitHub runner has no IPv6 route to it. The failure that causes
@@ -154,9 +164,20 @@ jobs:
       - name: Ask the site whether it is still healthy
         if: steps.gate.outputs.ready == 'true' && inputs.dry_run != true
         env:
-          SITE: ${{ github.ref_name == 'develop' && vars.DEV_URL || (vars.PRODUCTION_URL || 'https://robinsons-store.vercel.app') }}
+          # Chosen in the shell, not with && and ||: in an expression an empty DEV_URL falls
+          # through to the production address, and a dev run would report on the live site.
+          DEV_URL: ${{ vars.DEV_URL }}
+          PROD_URL: ${{ vars.PRODUCTION_URL || 'https://robinsons-store.vercel.app' }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-        run: node .github/scripts/health-check.mjs
+          # The dev site is behind Vercel's login wall; this lets the check past it.
+          BYPASS_DEV: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          if [ "${GITHUB_REF_NAME}" = "develop" ]; then
+            export SITE="$DEV_URL" VERCEL_AUTOMATION_BYPASS_SECRET="$BYPASS_DEV"
+          else
+            export SITE="$PROD_URL"
+          fi
+          node .github/scripts/health-check.mjs
 
       # A migration that half-applies against the store's ledger is the most expensive silent
       # failure this repository can produce, and until now the only way to learn about it was

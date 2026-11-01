@@ -2,7 +2,23 @@
 
 Single source for the current state of the build: what is done, what is verified, and what remains. The full vision is in robinsons_store_build_spec.md, setup is in RUNBOOK.md, and the per-feature sign-off record is in docs/VERIFICATION.md. Update this file and VERIFICATION.md in the same pull request as the work itself; if it is not recorded there, it is not done.
 
-Last updated: 2026-10-30, on branch claude/trusting-hamilton-pofbfs (latest: accounts moved, docs brought up to date and the dev environment planned, below; before it the architecture record of the AI usage log and the main ruleset, below; before it the money-type and region record round, below; before it the handover written to the standard, with the agents register and onboarding, below; before it the handover is prepared, below; before it the dev guard of 2026-09-01, recorded late; before it the deploy scare, corrected the same day, below; before it the invoice field registry and the first automated migration, below; before it the owner's answer on the vendor question map; before it Jira switched off with its autopilot parked and the watchdog moved to Slack, below; before it the vendor field registry; before it the platform capability round, the health check naming its own fix, owner round 6, owner round 5, the domain and email integration round in docs/DOMAIN_EMAIL.md, the vetting round, the Jira backlog round, the live-demo round, and owner feedback round 3).
+Last updated: 2026-10-30, on branch claude/dev-promotion-flow (latest: dev to production promotion automated, below; before it accounts moved, docs brought up to date and the dev environment planned, below; before it the architecture record of the AI usage log and the main ruleset, below; before it the money-type and region record round, below; before it the handover written to the standard, with the agents register and onboarding, below; before it the handover is prepared, below; before it the dev guard of 2026-09-01, recorded late; before it the deploy scare, corrected the same day, below; before it the invoice field registry and the first automated migration, below; before it the owner's answer on the vendor question map; before it Jira switched off with its autopilot parked and the watchdog moved to Slack, below; before it the vendor field registry; before it the platform capability round, the health check naming its own fix, owner round 6, owner round 5, the domain and email integration round in docs/DOMAIN_EMAIL.md, the vetting round, the Jira backlog round, the live-demo round, and owner feedback round 3).
+
+Dev to production promotion automated, 2026-10-30:
+- CI now runs on `develop` pushes and on pull requests into `develop`, so every change on the
+  dev site has passed the same gates as `main`.
+- Promote develop to production merges only when CI passed on `develop`'s last commit and the
+  dev site answers healthy; an unset `DEV_URL` refuses. It no longer uses auto-merge, which is
+  off on this repository, so the old step would have failed. After merging it starts CI, the
+  post-deploy watch and, when `supabase/` changed, the database scripts on `main`.
+- New: Bring develop level with main (on every push to `main`) and Dev site watch (after CI
+  on `develop`). Rules in `.github/scripts/branch-flow.mjs`, 23 tests, run in CI.
+- Fixed: with `SUPABASE_DB_URL_DEV` unset, a push to `develop` touching `supabase/` would have
+  applied its scripts to the production database, because `develop && DEV || PROD` falls
+  through on an empty value. The health step had the same flaw. Both choose in the shell now.
+- Still open (docs/ENVIRONMENTS.md steps 2, 5, 7, 8): `SUPABASE_DB_URL_DEV`, `DEV_URL`,
+  `VERCEL_AUTOMATION_BYPASS_SECRET`, and the setting that lets Actions open pull requests.
+  All need a repository admin; this account has Write. Until they exist promotion refuses.
 
 Accounts moved, docs brought up to date, dev environment planned, 2026-10-30:
 - The move to the store's accounts is done and the docs now say so: the Vercel project is

@@ -18,6 +18,10 @@ name: Promote develop to production
 # only answers "has a person said yes", which is the one question a machine must never
 # answer for itself.
 #
+# Before it merges it checks two things, and refuses on either (rules and tests in
+# .github/scripts/branch-flow.mjs): CI passed on develop's last commit, and the dev site at
+# DEV_URL answers healthy. No DEV_URL is a refusal, because then nothing was tried there.
+#
 # Inert until a develop branch exists, so it is safe to merge before the dev site is set up.
 
 on:
@@ -30,6 +34,9 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
+  # Reading CI's verdict on develop, and starting CI, migrate and the watch after the merge.
+  checks: read
+  actions: write
 
 jobs:
   promote:
@@ -61,6 +68,7 @@ jobs:
           git fetch origin main develop --quiet
           count=$(git rev-list --count origin/main..origin/develop)
           echo "Commits on develop that are not on main: $count"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
           if [ "$count" -eq 0 ]; then
             echo "Nothing to promote: develop and main already agree."
             echo "ready=false" >> "$GITHUB_OUTPUT"
@@ -68,9 +76,65 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # What CI said about develop's last commit. A push to develop runs CI; if none ran (the
+      # commit landed by a token, or before develop was in CI's branches), ask for one and
+      # wait for it rather than promoting something no gate has seen.
+      - name: Has CI passed on develop
+        id: ci
+        if: steps.ahead.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          sha=$(git rev-parse origin/develop)
+          echo "develop is at $sha"
+          read_ci() {
+            gh api "repos/${GITHUB_REPOSITORY}/commits/$sha/check-runs?check_name=build" \
+              --jq '.check_runs | sort_by(.started_at) | last | if . == null then "none" elif .status != "completed" then "pending" else .conclusion end'
+          }
+          state=$(read_ci)
+          if [ "$state" = "none" ]; then
+            echo "No CI run on that commit yet, so asking for one."
+            gh workflow run ci.yml --ref develop
+          fi
+          # Up to twenty minutes: CI takes about five.
+          for i in $(seq 1 40); do
+            state=$(read_ci)
+            [ "$state" != "none" ] && [ "$state" != "pending" ] && break
+            sleep 30
+          done
+          echo "CI on develop: $state"
+          case "$state" in none|pending) state="" ;; esac
+          echo "conclusion=$state" >> "$GITHUB_OUTPUT"
+
+      # Promotion means "it was tried on the dev site", so the dev site has to be up and
+      # agree with its own database. No DEV_URL means nobody could have tried it there.
+      - name: Is the dev site healthy
+        id: dev
+        if: steps.ahead.outputs.ready == 'true'
+        env:
+          SITE: ${{ vars.DEV_URL }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: node .github/scripts/health-check.mjs
+
+      - name: Decide
+        id: decide
+        if: steps.ahead.outputs.ready == 'true'
+        env:
+          AHEAD: ${{ steps.ahead.outputs.count }}
+          CI_CONCLUSION: ${{ steps.ci.outputs.conclusion }}
+          DEV_HEALTHY: ${{ steps.dev.outputs.checked == 'true' && steps.dev.outputs.healthy || '' }}
+        run: node .github/scripts/branch-flow.mjs promote
+
+      - name: Stop when it may not go
+        if: steps.decide.outputs.action == 'refuse' || steps.decide.outputs.action == 'wait'
+        run: |
+          echo "::error::Not promoted. The reason is in the Decide step above."
+          exit 1
+
       - name: Open or reuse the promotion pull request
         id: pr
-        if: steps.ahead.outputs.ready == 'true'
+        if: steps.decide.outputs.action == 'merge'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WHO: ${{ github.actor }}
@@ -86,11 +150,10 @@ jobs:
             "Promoting develop to production." \
             "" \
             "Started by @$WHO, which is the approval: this workflow only runs when a person" \
-            "runs it." \
+            "runs it. CI passed on develop's last commit and the dev site answered healthy." \
             "" \
-            "The change has already been merged to develop, deployed to the dev site, and tried" \
-            "there against dummy data. Merging this deploys it to the store and runs the same" \
-            "ordered list of database scripts against the live database." )
+            "Merging this deploys it to the store and runs the same ordered list of database" \
+            "scripts against the live database." )
           # A failure here is usually the repository setting that forbids Actions from opening
           # pull requests, not a problem with the change. Say so rather than dying silently.
           if ! gh pr create --base main --head develop --title "Promote develop to production" --body "$body"; then
@@ -103,12 +166,38 @@ jobs:
           number=$(gh pr list --head develop --base main --state open --json number --jq '.[0].number')
           echo "number=$number" >> "$GITHUB_OUTPUT"
 
-      - name: Merge it once its checks pass
+      - name: Which files are crossing
+        id: files
+        if: steps.pr.outputs.number != ''
+        run: |
+          CHANGED_FILES=$(git diff --name-only origin/main...origin/develop) node .github/scripts/branch-flow.mjs database
+
+      # Merged here, not with --auto: auto-merge is off on this repository, and the checks it
+      # would wait for are the ones read above.
+      - name: Merge it
         if: steps.pr.outputs.number != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # --auto holds the merge until every check is green, so a red check means this never
-          # lands rather than landing first and being noticed afterwards.
-          gh pr merge "${{ steps.pr.outputs.number }}" --merge --auto
-          echo "Pull request #${{ steps.pr.outputs.number }} will merge when its checks pass."
+          gh pr merge "${{ steps.pr.outputs.number }}" --merge
+          echo "Pull request #${{ steps.pr.outputs.number }} merged into main."
+
+      # A merge made with this workflow's token does not start other workflows (GitHub's rule,
+      # to stop loops), so the push to main is silent: no CI, no post-deploy watch, and no
+      # database scripts. Start them by hand. A dispatch is the one event the token may raise.
+      - name: Start what a person's merge would have started
+        if: steps.pr.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TOUCHED: ${{ steps.files.outputs.touched }}
+        run: |
+          gh workflow run ci.yml --ref main
+          echo "CI started on main."
+          # The watch waits for nothing when dispatched, so give Vercel time to go live.
+          sleep 90
+          gh workflow run post-deploy-watch.yml --ref main
+          echo "Post-deploy watch started."
+          if [ "$TOUCHED" = "true" ]; then
+            gh workflow run migrate.yml --ref main
+            echo "Database scripts started on the live database."
+          fi

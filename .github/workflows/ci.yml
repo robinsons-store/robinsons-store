@@ -1,10 +1,13 @@
 name: CI
 
 on:
+  # develop is the dev site's branch. Its pull requests need the same gates as main's, and
+  # a push there needs a CI result on its last commit, because promotion to main refuses
+  # anything that has not passed one.
   push:
-    branches: [main, claude/great-johnson-CFSbi]
+    branches: [main, develop, claude/great-johnson-CFSbi]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
   # On demand, for any branch. Added 2026-08-06 after a push landed (Vercel deployed it)
   # without GitHub creating a CI run at all, and there was no way to ask for one: the gates
   # could only be re-run by pushing another commit. A pull request with no CI result looks
@@ -88,6 +91,7 @@ jobs:
           node .github/scripts/jira-find-work.test.mjs
           node .github/scripts/jira-transition.test.mjs
           node .github/scripts/distinct-databases.test.mjs
+          node .github/scripts/branch-flow.test.mjs
           node --check .github/scripts/jira-comment.mjs
           node --check .github/scripts/jira-find-work.mjs
           node --check .github/scripts/jira-transition.mjs

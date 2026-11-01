@@ -1,0 +1,110 @@
+name: Bring develop level with main
+
+# Anything merged straight to main (a docs fix, an urgent repair, a change to these
+# workflows) must also reach develop, or the next promotion pull request would try to undo
+# it. docs/ENVIRONMENTS.md asked a person to remember that. This remembers instead.
+#
+# On every push to main: if main has files develop lacks, open (or reuse) a main to develop
+# pull request and merge it when it merges cleanly. A conflict is left open for a person,
+# with the pull request saying so. After a promotion main and develop hold the same files,
+# so nothing is opened.
+#
+# The merge is made with this workflow's token, which by GitHub's rule starts no other
+# workflow, so CI on develop (and the dev database scripts, when supabase/ changed) are
+# started here by hand.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: sync-develop
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Does develop lack anything main has
+        id: need
+        run: |
+          if ! git ls-remote --exit-code --heads origin develop >/dev/null 2>&1; then
+            echo "No develop branch, nothing to keep level."
+            echo "action=nothing" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch origin main develop --quiet
+          export MAIN_AHEAD=$(git rev-list --count origin/develop..origin/main)
+          if git diff --quiet origin/develop origin/main; then export TREES_DIFFER=false; else export TREES_DIFFER=true; fi
+          echo "Commits on main that develop lacks: $MAIN_AHEAD. Files differ: $TREES_DIFFER."
+          node .github/scripts/branch-flow.mjs sync
+          CHANGED_FILES=$(git diff --name-only origin/develop...origin/main) node .github/scripts/branch-flow.mjs database
+
+      - name: Open or reuse the pull request
+        id: pr
+        if: steps.need.outputs.action == 'open'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          existing=$(gh pr list --head main --base develop --state open --json number --jq '.[0].number' || echo "")
+          if [ -n "$existing" ]; then
+            echo "number=$existing" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! gh pr create --base develop --head main --title "Bring develop level with main" \
+            --body "Changes merged to main that develop does not have yet. Merged automatically when there is no conflict."; then
+            echo "::error::Could not open the pull request. If the message mentions permissions, turn on"
+            echo "Settings, Actions, General, 'Allow GitHub Actions to create and approve pull requests'."
+            exit 1
+          fi
+          echo "number=$(gh pr list --head main --base develop --state open --json number --jq '.[0].number')" >> "$GITHUB_OUTPUT"
+
+      - name: Merge it when it merges cleanly
+        id: merge
+        if: steps.pr.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          N: ${{ steps.pr.outputs.number }}
+        run: |
+          # GitHub works out mergeability a moment after the pull request opens.
+          for i in 1 2 3 4 5 6; do
+            state=$(gh pr view "$N" --json mergeable --jq .mergeable)
+            [ "$state" != "UNKNOWN" ] && break
+            sleep 10
+          done
+          if [ "$state" != "MERGEABLE" ]; then
+            echo "::warning::Pull request #$N does not merge cleanly ($state). A person resolves it."
+            gh pr comment "$N" --body "This does not merge cleanly into develop. Resolve the conflict here, then merge."
+            echo "merged=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          gh pr merge "$N" --merge
+          echo "merged=true" >> "$GITHUB_OUTPUT"
+
+      - name: Start what a person's merge would have started
+        if: steps.merge.outputs.merged == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TOUCHED: ${{ steps.need.outputs.touched }}
+        run: |
+          gh workflow run ci.yml --ref develop
+          if [ "$TOUCHED" = "true" ]; then
+            gh workflow run migrate.yml --ref develop
+            echo "Database scripts started on the dev database."
+          fi

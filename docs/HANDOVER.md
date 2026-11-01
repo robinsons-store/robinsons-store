@@ -71,6 +71,7 @@ Every name the code and workflows read. Values are never written here.
 |---|---|---|
 | `SUPABASE_DB_URL` | migrate, rls-audit | **Yes** (reset the database password) |
 | `SUPABASE_DB_URL_DEV` | migrate, on a push to `develop`. **Not set yet** (docs/ENVIRONMENTS.md step 2) | Yes |
+| `VERCEL_AUTOMATION_BYPASS_SECRET` | migrate on `develop`, dev-watch, promote: lets a workflow past Vercel's login wall on the dev site. Issued by Vercel, project Settings, Deployment Protection, Protection Bypass for Automation. **Not set yet** (docs/ENVIRONMENTS.md step 7) | Yes (regenerate it in Vercel) |
 | `CRON_SECRET` | migrate, post-deploy-watch | **Yes** |
 | `SLACK_WEBHOOK_URL` | migrate, rls-audit, post-deploy-watch, slack-announce | **Yes** |
 | `SLACK_BOT_TOKEN` | slack-autopilot, slack-lifecycle | **Yes** |
@@ -83,7 +84,7 @@ Every name the code and workflows read. Values are never written here.
 | Name | What |
 |---|---|
 | `PRODUCTION_URL` | The address the watchdog checks: `https://app.robinsonsgeneralstore.ca` |
-| `DEV_URL` | The dev site, `https://robinsons-store-git-develop-robinsons-store1.vercel.app`. **Not set yet** (docs/ENVIRONMENTS.md step 5) |
+| `DEV_URL` | The dev site, `https://robinsons-store-git-develop-robinsons-store1.vercel.app`. **Not set yet** (docs/ENVIRONMENTS.md step 5). Read by migrate on `develop`, dev-watch and promote; promote refuses while it is unset |
 | `VERCEL_TEAM_ID` | Optional. The team the Vercel workflows ask; unset, they use `team_pEEbrKESMFC4HpgFi3pa26P8` [R `.github/workflows/vercel-diagnose.yml:39`] |
 | `SLACK_REQUEST_CHANNEL` | The Slack channel ID the autopilot reads (accepted as a secret too) |
 | `SLACK_REQUIRE_MENTION` | Optional. `false` only for a requests-only channel |

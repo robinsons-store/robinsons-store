@@ -5,9 +5,13 @@ Status: ACCEPTED, 2026-10-30. Owner: the developer. Approver: Ravi Kiran.
 **Both environments exist. Production is the live site on the store's database; dev is the
 `develop` branch, deployed by the same Vercel project to its own address, on a separate
 database holding only invented data [V-run, Supabase list_projects, Vercel
-create_project_env and create_deployment, GitHub create_branch, 2026-10-30].** Two GitHub
-settings are still missing, so a database script merged to `develop` is not yet applied to dev
-by itself, and the ticket comment cannot link the dev site (step 2 and step 5 below). Asked
+create_project_env and create_deployment, GitHub create_branch, 2026-10-30].** The movement
+between them is automated in code: CI gates `develop`, the dev site is watched, promotion
+refuses unless CI passed and the dev site is healthy, and main's own changes are carried back
+to `develop` [R `.github/workflows/promote.yml`, `sync-develop.yml`, `dev-watch.yml`,
+`.github/scripts/branch-flow.mjs`]. Three GitHub settings and one Vercel setting are still
+missing, so dev scripts do not apply by themselves and promotion refuses until they exist
+(steps 2, 5, 7 and 8 below). Asked
 for on 2026-07-31: build to a dev site first, test there with dummy data, and promote to
 production only when Ravi says yes.
 
@@ -34,7 +38,7 @@ reaches the live site only when a person runs the promotion workflow.
 | Scripts | `supabase/run-order.txt`, on a push to `main` | The same list, on a push to `develop`, via `SUPABASE_DB_URL_DEV` |
 | Daily email cron | Runs | Does not: Vercel runs crons on production deployments only |
 | Login | Enforced (`auth_setup.sql` applied, `NEXT_PUBLIC_REQUIRE_AUTH` on) | Open demo mode: `auth_setup.sql` not run, the flag not set for Preview. Every column matches production except `app_user.auth_id`, which that script adds [V-run, information_schema on both, 2026-10-30] |
-| State | BUILT | PARTIAL: steps 2, 5 and 6 below are open |
+| State | BUILT | PARTIAL: steps 2, 5, 6, 7 and 8 below are open |
 
 ## Three decisions, and why
 
@@ -51,9 +55,12 @@ exists to prevent. A free second project costs nothing and keeps the two apart.
 write to the store's real vendors and invoices until 2026-10-30. Now Preview points at dev
 for every branch, so the live database is reachable only from the live site.
 
-Approval is a person running **Actions, Promote develop to production**: it opens and merges
-a `develop` to `main` pull request once the checks pass [R `.github/workflows/promote.yml:1-21`].
-Nothing on a schedule can start it. Jira, which once carried QA and Approved statuses, is off
+Approval is a person running **Actions, Promote develop to production**. It merges `develop`
+into `main` only when CI passed on `develop`'s last commit and the dev site's `/api/health`
+answers healthy; an unset `DEV_URL` is a refusal, because then nothing was tried there. It
+then starts CI, the post-deploy watch and (when `supabase/` changed) the database scripts on
+`main`, because a merge made by a workflow's token starts no workflow by itself
+[R `.github/workflows/promote.yml`]. Nothing on a schedule can start it. Jira, which once carried QA and Approved statuses, is off
 since 2026-08-12.
 
 ## What crosses, and what does not
@@ -77,17 +84,29 @@ since 2026-08-12.
 | 4 | Branch `develop` from `main`. The Slack autopilot now targets it, and promotion to `main` is Actions, Promote develop to production | The developer | BUILT 2026-10-30 |
 | 5 | Repository variable `DEV_URL` = `https://robinsons-store-git-develop-robinsons-store1.vercel.app` | admin@ | TARGET |
 | 6 | Let Ravi open the dev site. Preview addresses need a Vercel login on the team; or add `dev.robinsonsgeneralstore.ca` to the project for branch `develop` and ask Vianet for its CNAME by phone, since custom domains skip the login | Ravi Kiran | TARGET |
+| 7 | Repository secret `VERCEL_AUTOMATION_BYPASS_SECRET`: Vercel, project `robinsons-store`, Settings, Deployment Protection, Protection Bypass for Automation, Add. Without it every workflow that asks the dev site gets Vercel's login page and reports it unhealthy, so promotion refuses | admin@ (Vercel), then a repository admin (GitHub) | TARGET |
+| 8 | Settings, Actions, General, Workflow permissions: "Allow GitHub Actions to create and approve pull requests". Promote and sync-develop open pull requests with the workflow token | A repository admin | Unknown: not readable with Write access [V-run, `gh api .../actions/permissions/workflow` 403, 2026-10-30] |
 
-**Keep `develop` level with `main`.** Anything merged straight to `main` (this change, for
-one) must also reach `develop`, or the next promotion pull request will try to undo it. Open
-a `main` to `develop` pull request after any such merge.
+**Keep `develop` level with `main`.** Anything merged straight to `main` must also reach
+`develop`. **Bring develop level with main** does it on every push to `main`: it opens a
+`main` to `develop` pull request when main has files develop lacks, merges it when it merges
+cleanly, and leaves a conflict open for a person. After a promotion the two hold the same
+files, so it opens nothing [R `.github/workflows/sync-develop.yml`].
 
 **Check it worked:** the dev site lists the invented vendors, not the store's. After step 2,
 Actions, Apply database scripts, on `develop`: the gate prints a non-zero length for the dev
-secret and the guard passes.
+secret and the guard passes. After steps 5 and 7, Actions, Dev site watch, Run workflow:
+green, with "All 8 checks passed". Then Promote develop to production on a `develop` that is
+ahead of `main`: the Decide step prints `merge`.
 
 ## What could still go wrong
 
+- **Fixed 2026-10-30: dev scripts falling through to production.** migrate chose its
+  connection as `develop && DEV || PROD`. In a workflow expression an empty value counts as
+  false, so with `SUPABASE_DB_URL_DEV` unset a push to `develop` touching `supabase/` got the
+  production string, and the guard passed it (no dev string to compare). The choice is now
+  made in the shell, and an empty dev string skips the run. The health step had the same
+  shape and would have reported the live site as dev's.
 - **The dev site pointed at the live database.** A copy-paste mistake in Vercel's Preview
   variables. The Preview `NEXT_PUBLIC_SUPABASE_URL` must end in `wqxcmchxkdhigacvxgad`, the
   Production one in `mhcjreqvvhnrtgwtuwvr`.
@@ -115,3 +134,16 @@ the promotion workflow is started by hand only; migrate picks `SUPABASE_DB_URL_D
 `develop` and runs the guard first [R `.github/workflows/migrate.yml:66-106`]. Not checked:
 Vercel's crons-on-production-only rule and the Pro compute charge for a second project, both
 `[J-open]`. Sources: Supabase API, Vercel API, GitHub API, this repository.
+
+**Basis, second pass (2026-10-30): 7 claims checked, 7 confirmed, 0 killed, 4 sources.**
+Confirmed: the dev site's built bundle carries the dev project's URL and its health check
+passes all 8 checks [V-run, Vercel web_fetch_vercel_url]; the dev database holds 2 stores, 46
+vendors (8 named DEV), 37 invoices, and the dev REST API returns the DEV vendors with the
+Preview anon key [V-run, Supabase execute_sql and curl]; the repository has neither
+`SUPABASE_DB_URL_DEV`, `VERCEL_AUTOMATION_BYPASS_SECRET` nor `DEV_URL` [V-run, `gh secret
+list`, `gh variable list`]; repository auto-merge is off, which the old promote step relied
+on [V-run, `gh api repos/...` `allow_auto_merge: false`]; `main`'s ruleset requires a pull
+request and no status checks [V-run, ruleset 25802611]; `develop` is one commit behind `main`
+[V-run, `git rev-list`]; the branch rules pass 23 cases [V-run, `node
+.github/scripts/branch-flow.test.mjs`]. Not checked: that a CI run started by dispatch fires
+the post-deploy watch by itself, so promote starts the watch directly `[J-open]`.
