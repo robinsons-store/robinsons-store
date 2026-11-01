@@ -65,6 +65,10 @@ Every name the code and workflows read. Values are never written here.
 | `RESEND_API_KEY`, `ALERT_EMAIL_FROM`, `ALERT_EMAIL_TO` | Resend, set by hand | Not set | Only when the daily email is wanted |
 | `AGENTMAIL_API_KEY` | AgentMail | All | Installed, not wired in [R `docs/PLATFORM.md`] |
 | `POSTGRES_*`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_JWT_SECRET`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | The Supabase integration | Production | Written by the integration on 2026-07-31; the code reads none of them |
+| `SLACK_SIGNING_SECRET` | Slack app, Basic Information | **Not set** | NEW (ADR-006). Ask in Slack: without it `/api/slack/events` refuses every request. Rotate if the developer leaves |
+| `SLACK_BOT_TOKEN` | Slack app | **Not set** | NEW in Vercel (ADR-006); same value as the GitHub secret. Posts the answers. Rotate if the developer leaves |
+| `SLACK_REQUEST_CHANNEL` | Slack | **Not set** | NEW in Vercel (ADR-006); the channel the answers are given in, same as the GitHub variable |
+| `SLACK_STORE_ID` | Supabase, `store.id` | **Not set** | NEW (ADR-006); which store a Slack question is answered about. Unset: "not set up" replies, no model call |
 
 **GitHub, Actions repository secrets**
 
@@ -88,6 +92,13 @@ Every name the code and workflows read. Values are never written here.
 | `VERCEL_TEAM_ID` | Optional. The team the Vercel workflows ask; unset, they use `team_pEEbrKESMFC4HpgFi3pa26P8` [R `.github/workflows/vercel-diagnose.yml:39`] |
 | `SLACK_REQUEST_CHANNEL` | The Slack channel ID the autopilot reads (accepted as a secret too). Set 2026-10-30 to the workspace's general channel, where the bot is a member [V-run, `gh variable list`, 2026-10-30] |
 | `SLACK_REQUIRE_MENTION` | Optional. `false` only for a requests-only channel |
+
+**Slack app, scopes and events** (the app from `docs/slack-app-manifest.yml`)
+
+| What | Why | State |
+|---|---|---|
+| Scopes `channels:history`, `chat:write`, `reactions:read`, `reactions:write` | The build sweep and its status card | Set |
+| Scope `app_mentions:read`, Event Subscriptions on with bot event `app_mention`, Request URL `https://<the app's address>/api/slack/events` | Ask in Slack (ADR-006). Changing scopes needs the app reinstalled to the workspace | NEW, not yet set; the manifest is unchanged until approved |
 
 ## When someone leaves
 

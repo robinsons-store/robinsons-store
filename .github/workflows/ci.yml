@@ -76,6 +76,13 @@ jobs:
           npx tsc -p scripts/aiusage-check/tsconfig.json
           cp scripts/aiusage-check/check.js scripts/aiusage-check/out/
           node scripts/aiusage-check/out/check.js
+      # Ask in Slack: the real compiled /api/slack/events route with Slack, the model and
+      # Supabase mocked. Signature, money withheld, grounding, store scoping, threads, claims.
+      - name: Slack answer checks
+        run: |
+          npx tsc -p scripts/slackask-check/tsconfig.json
+          cp scripts/slackask-check/check.js scripts/slackask-check/out/
+          node scripts/slackask-check/out/check.js
       # Schedule names and export paging: a shared or shortened name never lands shifts on
       # the wrong person, and the archive export never drops or repeats a row mid-read.
       - name: Import and export checks

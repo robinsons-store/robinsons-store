@@ -100,6 +100,54 @@ because one API call did not answer.
 If you make a channel that exists solely for requests, set the variable
 `SLACK_REQUIRE_MENTION` to `false` and plain messages count.
 
+## Questions are answered in the thread, not built
+
+Ask the bot something and it answers under your message, usually within seconds:
+`@<the app's name> when is the candle order due?` (decision: docs/adr/ADR-006).
+
+Which it is, a question or a change, is decided by the words, never by a model
+(`.github/scripts/slack-intent.cjs`, shared by both halves so they cannot disagree):
+
+| You write | It does |
+|---|---|
+| `ask: ...` | Answers it |
+| `build: ...` | Builds it on the next sweep |
+| A question ("when", "which", "how do I", "can you tell me", ends with ?) | Answers it |
+| A request ("add", "fix", "can you add", "the vendor form needs a column") | Builds it on the next sweep |
+| Anything that reads as neither, or as both ("add a column?") | Replies asking you to send it again with `ask:` or `build:` |
+
+| Reaction | What it means |
+|---|---|
+| 💬 | answered as a question |
+| ❔ | it asked you which you meant; send it again with a prefix |
+
+What an answer will and will not contain:
+
+- **Only the store's own records**: knowledge notes, vendors, and how the app works. The
+  same grounding check as Ask in the app: an answer naming a vendor that is not on file is
+  not shown.
+- **No dollar figures, ever.** The channel has people of every role, so the asker is treated
+  as staff. Invoices are never read, and an answer that still carries an amount is replaced
+  by a pointer to the app.
+- **It counts against the store's daily AI limit**, like Ask in the app.
+- A question inside a thread is answered there. Anything else in a thread is left alone.
+- "log this issue" is not filed from Slack: use Suggestions in the app.
+
+How it runs: Slack calls `/api/slack/events` on the app's own Vercel project when the bot
+is named. No new service and no new plan. The route accepts only requests signed with the
+Slack app's signing secret. The 30-minute sweep below never builds a question.
+
+Setting it up (each listed in docs/HANDOVER.md; none is set yet):
+
+1. Vercel environment variables: `SLACK_SIGNING_SECRET` (Slack app, Basic Information),
+   `SLACK_BOT_TOKEN` (the same bot token as the GitHub secret), `SLACK_REQUEST_CHANNEL`, and
+   `SLACK_STORE_ID` (the store's `store.id`). Redeploy.
+2. Slack app: add the bot scope `app_mentions:read`, turn on Event Subscriptions with the
+   Request URL `https://<the app's address>/api/slack/events` and the bot event
+   `app_mention`, then reinstall the app to the workspace.
+
+Until both are done the route refuses every request; the sweep already skips questions.
+
 ## What it will not do
 
 - **Push a change to the automation.** A change that touches `.github/` or `.claude/` never
@@ -250,6 +298,7 @@ The scopes it needs:
 - `channels:history` (read the messages)
 - `chat:write` (reply in the thread)
 - `reactions:read` and `reactions:write` (the 👀 and ✅ state)
+- `app_mentions:read`, only for answering questions (section above)
 
 Then invite the bot into the channel: `/invite @<the app's name>`.
 

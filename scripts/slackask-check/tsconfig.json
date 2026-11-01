@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "allowJs": true,
+    "outDir": "out",
+    "rootDir": "../..",
+    "baseUrl": "../..",
+    "paths": { "@/*": ["src/*"] },
+    "lib": ["es2020", "dom"]
+  },
+  "files": ["../../src/app/api/slack/events/route.ts"]
+}
