@@ -257,6 +257,24 @@ create table feedback_summary (
 );
 create index feedback_summary_store_idx on feedback_summary(store_id);
 
+-- The database dates every save of a description, whatever the writer sends (auth_setup.sql 3g
+-- counts only a file saved by then).
+create or replace function public.feedback_summary_dated()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  new.created_at := now();
+  return new;
+end;
+$$;
+
+drop trigger if exists feedback_summary_dated on public.feedback_summary;
+create trigger feedback_summary_dated
+  before insert or update on public.feedback_summary
+  for each row execute function public.feedback_summary_dated();
+
 -- One row per AI model call, for the daily per-store cap (src/lib/aiUsage.ts). Metadata
 -- only: never the prompt, the store data sent with it, or the answer. Fresh installs get
 -- this here; existing databases get the identical table and functions from

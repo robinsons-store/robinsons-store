@@ -186,12 +186,12 @@ new addresses and updating app_user.email is the whole change.
 
 ## Who does what
 
-- Owner or Raviteja in the DOMAIN PANEL: repoint or delete stories@; archive joanne@;
+- Owner or developer in the DOMAIN PANEL: repoint or delete stories@; archive joanne@;
   create invoices@ (and any of the suggested boxes); and, when doing step 3, add the
   Resend SPF/DKIM records. (Two items were removed from this line on 2026-08-12: "clear
   the three full mailboxes", which was the corrected quota error and was never real work,
   and the Vercel CNAME, which is done and live.)
-- Raviteja in VERCEL: add the custom domain; set ALERT_EMAIL_FROM after Resend verifies.
+- Developer in VERCEL: add the custom domain; set ALERT_EMAIL_FROM after Resend verifies.
 - The app (Claude, next build rounds): the email-intake pipeline of step 4 once invoices@
   exists and forwarding is chosen; nothing else needs code.
 

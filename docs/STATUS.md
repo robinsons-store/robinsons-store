@@ -2,7 +2,18 @@
 
 Single source for the current state of the build: what is done, what is verified, and what remains. The full vision is in robinsons_store_build_spec.md, setup is in RUNBOOK.md, and the per-feature sign-off record is in docs/VERIFICATION.md. Update this file and VERIFICATION.md in the same pull request as the work itself; if it is not recorded there, it is not done.
 
-Last updated: 2026-10-30, on branch claude/department-fields-followups (latest: department field follow-ups, below; before it department field export error handling, below; before it screenshot descriptions follow the screenshot, below; before it the nine-diagram Miro board and separate archive, below; before it product direction and skill precedence, below; before it stored files fenced by store and role, below; before it money fenced by role at the database, below; before it PR #86 documents builder self-checks and the develop-to-main release flow, below; before it the AI view and the standards map in the architecture doc, below; before it tier A self-merge wired into the Slack loop, below; before it module checks and automation tests run in CI by convention, below; before it accounts moved, docs brought up to date and the dev environment turned on, below; before it the architecture diagrams corrected against the code, below; before it the architecture record of the AI usage log and the main ruleset, below; before it the money-type and region record round, below; before it the handover written to the standard, with the agents register and onboarding, below; before it the handover is prepared, below; before it the dev guard of 2026-09-01, recorded late; before it the deploy scare, corrected the same day, below; before it the invoice field registry and the first automated migration, below; before it the owner's answer on the vendor question map; before it Jira switched off with its autopilot parked and the watchdog moved to Slack, below; before it the vendor field registry; before it the platform capability round, the health check naming its own fix, owner round 6, owner round 5, the domain and email integration round in docs/DOMAIN_EMAIL.md, the vetting round, the Jira backlog round, the live-demo round, and owner feedback round 3).
+Last updated: 2026-10-30, on branch claude/architecture-refs-refresh (latest: architecture citations refreshed against main, below; before it every role passes the file check for a screenshot description, below; before it department field follow-ups, below; before it department field export error handling, below; before it screenshot descriptions follow the screenshot, below; before it the nine-diagram Miro board and separate archive, below; before it product direction and skill precedence, below; before it stored files fenced by store and role, below; before it money fenced by role at the database, below; before it PR #86 documents builder self-checks and the develop-to-main release flow, below; before it the AI view and the standards map in the architecture doc, below; before it tier A self-merge wired into the Slack loop, below; before it module checks and automation tests run in CI by convention, below; before it accounts moved, docs brought up to date and the dev environment turned on, below; before it the architecture diagrams corrected against the code, below; before it the architecture record of the AI usage log and the main ruleset, below; before it the money-type and region record round, below; before it the handover written to the standard, with the agents register and onboarding, below; before it the handover is prepared, below; before it the dev guard of 2026-09-01, recorded late; before it the deploy scare, corrected the same day, below; before it the invoice field registry and the first automated migration, below; before it the owner's answer on the vendor question map; before it Jira switched off with its autopilot parked and the watchdog moved to Slack, below; before it the vendor field registry; before it the platform capability round, the health check naming its own fix, owner round 6, owner round 5, the domain and email integration round in docs/DOMAIN_EMAIL.md, the vetting round, the Jira backlog round, the live-demo round, and owner feedback round 3).
+
+Architecture citations refreshed against main, 2026-10-30 (branch claude/architecture-refs-refresh):
+- Rechecked every architecture file-and-line citation against this branch; the change table is
+  in VERIFICATION.md. The AI view names feedback_summary consistently.
+- The Slack review job is BUILT in the merged workflow. Live request verification is tracked privately.
+- Ruleset evidence follows ADR-002; repo-owned docs use developer roles for attribution.
+- README.md already routes to docs/README.md without a numbered document count.
+- Checks: citation bounds, referenced source text, Markdown links, Mermaid structure and
+  an independent documentation read. App gates were not run locally: node_modules is absent.
+
+
 
 Department field follow-ups, 2026-10-30:
 - BUILT. The invoice check uses opposite vendor and invoice choices for unlocked terms
@@ -55,22 +66,36 @@ The Slack lifecycle workflow runs its scripts from the base branch, 2026-10-30:
   ref, if the ref gives anything but the base for any trigger the workflow listens to, if a
   trigger is added without a matching case, or if a script runs before the checkout.
 
-Screenshot descriptions follow the screenshot, 2026-10-25 (branch claude/arch-04-feedback-summary;
-ARCH-15, docs/adr/ADR-005-screenshot-descriptions-follow-the-screenshot.md, see VERIFICATION.md):
-- The AI's description of a suggestion screenshot now lives in its own table, feedback_summary,
-  and opens to the same people as the screenshot: lead, manager, owner, and the member who
-  attached it. The suggestion itself, its note and screen, still opens to the whole store.
+Every role passes the file check for a screenshot description, 2026-10-30 (branch
+claude/feedback-summary-follow-up; ARCH-15, ADR-005, see VERIFICATION.md):
+- A description opens only to members who may open the file it was read from, saved under that
+  name by the time the description was, lead, manager and owner included. One whose file is
+  not in storage, or that names no file, opens to nobody.
+- The database dates every save of a description, a rewrite included, so reading a replacement
+  screenshot again keeps the description open to whoever saved the new file.
+- Applies on merge: supabase/feedback_summary.sql runs again from run-order.txt and matches
+  auth_setup.sql section 3g; schema.sql has the same date trigger for fresh installs.
+- feedback_summary_test.sql has new cases for a missing file, a later file, another store's file,
+  a workbook, a description with no file, and a replaced screenshot. Verify after the merge with
+  ADR-005 condition 3.
+
+Screenshot descriptions follow the screenshot, 2026-10-25, merged and applied to the live
+database 2026-10-30 (branch claude/arch-04-feedback-summary; ARCH-15,
+docs/adr/ADR-005-screenshot-descriptions-follow-the-screenshot.md, see VERIFICATION.md):
+- The AI's description of a suggestion screenshot lives in its own table, feedback_summary, and
+  opens to the same people as the screenshot: lead, manager, owner, and the member who attached
+  it. The suggestion itself, its note and screen, opens to the whole store.
 - The screenshot reader saves as the member who asked for it and is told not to copy dollar
   amounts, pay or personal details. Suggestions, the developer digest and the export read the
-  new table. Older descriptions move into it and feedback.ai_summary is dropped.
+  new table. Older descriptions moved into it and feedback.ai_summary is dropped.
 - It applies itself: supabase/feedback_summary.sql runs after documents_by_role.sql and matches
-  auth_setup.sql section 3g. Demo databases get the table open like the others.
+  auth_setup.sql section 3g. Demo databases get the table open like the others. The migration
+  run on main 373b2b5 applied it to the live database.
 - Proven on Supabase Postgres 17 with the storage schema: feedback_summary_test.sql 85 of 85 on
   a fresh install, on a copy upgraded from main, and on one upgraded from the stored-files
   branch, 5 of 5 on demo copies; the Suggestions reads and the reader's calls through PostgREST
   and the storage service, 33 of 33; documents and money tests still 163 and 130.
-- After the merge: read ADR-005 condition 3 once. The app and the migration land within
-  minutes; in between, Suggestions may not load or may show no descriptions.
+- Verify on the live database: ADR-005 condition 3.
 
 The architecture board on the store's Miro account, 2026-10-30:
 - BUILT: "Robinsons store architecture" shows the nine diagrams of docs/ARCHITECTURE.md,

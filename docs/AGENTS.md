@@ -23,7 +23,7 @@ current Claude models reject non-default sampling settings [R `src/app/api/extra
 | **Invoice reader** | Reads an invoice photo or PDF into vendor, date, line items and confidence per line | `/api/extract` [R `src/app/api/extract/route.ts:80`] | Signed-in member resolved first [R `:69`]; strict JSON contract; low-confidence dollar lines cannot save until a person fixes or confirms them [R `RUNBOOK.md:105-107`]; a refusal tells staff to enter it by hand [R `:124`] | BUILT |
 | **Ask the store** | Answers questions from the store's own notes, vendors and invoices, with citations; also logs "log this issue: ..." straight into Suggestions | `/api/ask` [R `src/app/api/ask/route.ts:39`] | Dollar data withheld from roles that cannot see money [R `:36`, `:91`]; issue logging is deterministic, verbatim, attributed and only for signed-in members [R `:95-96`]; answer stripped to plain text [R `:166`] | BUILT |
 | **Reorder summary** | Turns the formula-based reorder list into a short plain-language summary | `/api/reorder` [R `src/app/api/reorder/route.ts:23`] | Money roles only once login is enforced [R `:33`]; plain text [R `:110`] | BUILT |
-| **Suggestion screenshot reader** | Describes a screenshot attached to an owner suggestion, so the developer digest carries it as text | `/api/feedback-triage` [R `src/app/api/feedback-triage/route.ts:30`] | Under 120 words, plain text, no dollar amounts, pay or personal details copied [R `:21-26`, `:82`]; runs as the caller and saves to `feedback_summary`, which opens only to lead, manager, owner and whoever attached the screenshot [R `:85-89`] [R `supabase/auth_setup.sql:658-695`] (ADR-005); best-effort, never blocks saving the suggestion [R `:14-19`] | BUILT |
+| **Suggestion screenshot reader** | Describes a screenshot attached to an owner suggestion, so the developer digest carries it as text | `/api/feedback-triage` [R `src/app/api/feedback-triage/route.ts:30`] | Under 120 words, plain text, no dollar amounts, pay or personal details copied [R `:21-26`, `:82`]; runs as the caller and saves to `feedback_summary`, which opens only to lead, manager, owner and whoever attached the screenshot [R `:85-91`] [R `supabase/auth_setup.sql:675-710`] (ADR-005); best-effort, never blocks saving the suggestion [R `:14-19`] | BUILT |
 | Ask the store over a vector index | Same answers, at a data size one prompt cannot hold | Not built | | TARGET (deferred until the data outgrows one prompt [R `docs/ARCHITECTURE.md:279`]) |
 | Email invoice intake | Vendors email invoices to invoices@, the reader files them | AgentMail installed, not wired [R `docs/PLATFORM.md`] | Sender allowlist (design in docs/DOMAIN_EMAIL.md section 4) | SCAFFOLDED (blocked on the invoices@ mailbox) |
 
@@ -80,7 +80,8 @@ Source: this repository.
 The Golden-case evals row was added on branch ai-golden-evals (2026-10-24): 2 claims, both
 read at the named lines that session.
 The screenshot reader row was updated on branch claude/arch-04-feedback-summary (2026-10-25,
-ADR-005): 5 claims, each read at the named lines that session.
+ADR-005): 5 claims, each read at the named lines that session. Its two moved references were
+re-read on branch claude/feedback-summary-follow-up (2026-10-30).
 The autopilot review job, 2026-10-30, branch claude/slack-autopilot-review: 7 claims checked,
 6 confirmed, 1 killed. Killed: the Slack autopilot row's BUILT, now PARTIAL, because the
 request channel variable is unset and no sweep has passed its first step. Confirmed: the

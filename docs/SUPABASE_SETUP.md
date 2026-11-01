@@ -142,8 +142,9 @@ Run in this order; skip nothing (each is safe to re-run):
 12. `feedback_summary.sql`: the AI's description of a suggestion screenshot gets its own table,
    `feedback_summary` (docs/adr/ADR-005-screenshot-descriptions-follow-the-screenshot.md).
    Descriptions already on `feedback.ai_summary` move into it, then that column is dropped.
-   With enforced login a description opens to lead, manager and owner, and to the member who
-   attached the screenshot; on a demo database the table is open like the others. It must run
+   With enforced login a description opens to the members who may open the file it was read
+   from (lead, manager and owner, and the member who attached the screenshot), and the
+   database dates every save; on a demo database the table is open like the others. It must run
    after `documents_by_role.sql`, and it is the same block as `auth_setup.sql` section 3g.
    `feedback_summary_test.sql` is its proof, for a disposable database with Supabase's storage
    schema only; it is never in the run order.

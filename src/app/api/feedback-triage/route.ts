@@ -82,7 +82,9 @@ export async function POST(req: NextRequest) {
     const summary = plainText(result.text);
     if (!summary) return NextResponse.json({ message: "model returned nothing" });
 
-    // The file it was read from goes with it: who may read the text follows that file.
+    // The file it was read from goes with it: who may read the text follows that file. No
+    // created_at is sent: the database dates every save, a rewrite included, so reading a
+    // replacement screenshot again keeps the text open to whoever saved the new file.
     const saved = await db.from("feedback_summary").upsert(
       { feedback_id: row.id, store_id: row.store_id, screenshot_path: row.screenshot_path, summary },
       { onConflict: "feedback_id" }
