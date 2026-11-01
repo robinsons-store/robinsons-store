@@ -19,12 +19,15 @@ data live", and one more thing that breaks in August when it matters most.
 
 ## Two open risks, both found 2026-08-12
 
-These outrank every feature question below. Both are closed by moving the accounts to the
-store, in docs/HANDOVER.md, which also registers who holds each account today.
+These outrank every feature question below. The accounts now belong to the store
+(docs/HANDOVER.md); both risks close only when the store's card is on the paid plan, which
+is item A-01 there and not yet confirmed.
 
 ### 1. Vercel Hobby does not license this app
 
-The account is on **Hobby**. Vercel's fair use guidelines
+The project is on the store's team `robinsons-store1` since 2026-10-25. Its plan is not
+readable from the API used here, and the team showed no charges for October [V-run, Vercel
+list_billing_charges, 2026-10-30], which is what **Hobby** looks like. Vercel's fair use guidelines
 (https://vercel.com/docs/limits/fair-use-guidelines#commercial-usage) say:
 
 > Hobby teams are restricted to non-commercial personal use only. All commercial usage of
@@ -58,10 +61,10 @@ Point-in-time recovery is a paid add-on on top (about $100 a month for 7 days), 
 it replaces daily backups rather than adding to them. PITR is overkill at this volume; daily
 backups are not.
 
-**Confirmed 2026-10-18: the organization is on Free.** So the store's vendors, invoices,
-payments, HR records and uploaded invoice images have no automatic backup, against a six-year
-Canadian record-keeping requirement. Supabase Pro is $25 a month. docs/HANDOVER.md Step 2
-turns it on as part of moving the account to the store.
+**The organization was still on Free when last read, 2026-10-30.** So the store's vendors,
+invoices, payments, HR records and uploaded invoice images have no automatic backup, against
+a six-year Canadian record-keeping requirement. Supabase Pro is $25 a month, on the store's
+card as admin@ (docs/HANDOVER.md, A-01).
 
 The app's own Export screen (one workbook, a tab per table) is a real mitigation and worth
 running on a schedule regardless, but it is a manual export, not a restore path: it does not
@@ -71,12 +74,12 @@ carry the storage bucket, and nobody will remember to run it every week in seaso
 
 | Service | Does what | Plan | Notes |
 |---|---|---|---|
-| **Vercel** | Hosts the app, deploys on push, runs the daily cron | **Hobby, see risk 1** | Project `robinsons-store`. Preview deploys per PR are how the practice site works |
-| **Supabase** | Postgres, Auth, Storage (`documents` bucket) | **Free, confirmed 2026-10-18, see risk 2** | ca-central Toronto. RLS per store per role. A second project is planned for dev per ENVIRONMENTS.md |
+| **Vercel** | Hosts the app, deploys on push, runs the daily cron | **Hobby unless confirmed otherwise, see risk 1** | Team `robinsons-store1`, project `robinsons-store`. Preview deploys per PR, all on the dev database (ENVIRONMENTS.md) |
+| **Supabase** | Postgres, Auth, Storage (`documents` bucket) | **Free as of 2026-10-30, see risk 2** | ca-central Toronto. RLS per store per role. Second project `robinsons-store-dev` holds the repository seed data for dev, never the live ledger (ENVIRONMENTS.md) |
 | **Anthropic API** | Capture extraction, Ask-the-store, reorder summary, feedback triage | Pay as you go | Stores in the US; what each route sends is in "What leaves Canada" below. Default model claude-sonnet-5. $5 to $40 a month by volume |
 | **Resend** | The daily due-date email | Free tier is adequate | Optional. Off unless the keys are set. No Canadian region, see "What leaves Canada" |
 | **Vianet** | Domain robinsonsgeneralstore.ca, 5 of 10 mailboxes, store internet | About $10/mo | Domain expires 2026-10-16, auto-renew on. No self-serve DNS editor, changes are a phone call |
-| **GitHub** | Code, and eleven Actions workflows | Free | `ci`, `migrate`, `post-deploy-watch`, `promote`, `rls-audit`, `slack-announce`, `slack-autopilot`, `slack-lifecycle`, `vercel-diagnose`, `vercel-protect`, and `jira-autopilot` (parked) |
+| **GitHub** | Code at `robinsons-store/robinsons-store`, and eleven Actions workflows | Free | `ci`, `migrate`, `post-deploy-watch`, `promote`, `rls-audit`, `slack-announce`, `slack-autopilot`, `slack-lifecycle`, `vercel-diagnose`, `vercel-protect`, and `jira-autopilot` (parked) |
 | **Slack** | Build requests in, watchdog and migration messages out | Free | Bot app from docs/slack-app-manifest.yml plus an incoming webhook. See docs/SLACK_AUTOPILOT.md |
 | **Jira** | Switched off 2026-08-12 | None | The autopilot is parked, not deleted. See docs/JIRA_AUTOPILOT.md |
 | **AgentMail** | Inbound programmatic inbox | Marketplace, free tier | Installed 2026-08-12, **not yet wired in**. Chosen mechanism for email invoice intake, see DOMAIN_EMAIL.md section 4 |
@@ -153,7 +156,7 @@ Ordered by value. None of these is adopted yet.
 | **Vercel WAF rate limit on `/login`** | Auth is enforced and the app is now on a public domain | ADOPTED 2026-08-17: `.github/workflows/vercel-protect.yml` reads and writes the firewall by API (preview and apply modes, idempotent by rule name). Run apply once after any token change |
 | **GitHub secret scanning with push protection** | "Keep secrets out of the repo and out of chat" (skill) | Still open, and it is a repo setting no API in this session can flip: GitHub, repo Settings, Advanced Security, enable secret scanning and push protection. Two clicks by the developer |
 | **Supabase Advisors** | Invariant 6: a new table needs RLS in schema.sql AND auth_setup.sql | The RLS half is COVERED 2026-08-17 by `.github/workflows/rls-audit.yml`: weekly and on demand, lists public tables with RLS off or empty, tells Slack and goes red. The hosted Advisors page (performance lints and the rest) stays a dashboard visit |
-| **Deployment protection on the dev project** | ENVIRONMENTS.md: dev holds invented data but is publicly reachable | Low value while dev data is fake, real the moment anyone seeds it from production. Password protection is Pro |
+| **Deployment protection on the dev site** | ENVIRONMENTS.md: dev holds seed data, including the curated 2026 bookings rows | Already on: preview addresses require a Vercel login [V-run, get_project `ssoProtection`, 2026-10-30]. A custom `dev.` domain skips it, which is fine while dev data is invented |
 
 ## Available, deliberately not adopted
 
@@ -167,10 +170,10 @@ sidebar.
 | **Vercel Workflows** | Cron plus a route handles this volume. Revisit if email intake grows past a few dozen messages a day |
 | **Vercel Sandboxes** | No untrusted code to run |
 | **Vercel Agent** | The AI work already runs through `src/app/api/*` against the Anthropic API. A second agent layer duplicates it |
-| **Vercel Flags** | The dev site plus the QA-to-Approved gate already answers "try it before it ships" |
+| **Vercel Flags** | The dev site plus the promotion workflow already answers "try it before it ships" |
 | **Vercel Image Optimization** | Thumbnails come from Supabase signed URLs, which expire; optimizing them is fiddly for little gain on department laptops |
 | **Vercel Toolbar comments (browser extension)** | Comments are visible only to signed-in members of the Vercel team, and this plan seats one. The owner would need a paid seat, a Vercel account, and a developer tool to say what the in-app Suggestions page already lets him say in plain words on his phone. The developer can install the extension for personal use any time; that needs no project change |
-| **Vercel Connect: Miro, Notion** | Those are the builder's tooling, not the store's app. A general store has no Miro requirement |
+| **Vercel Connect: Miro, Notion** | Those are the builder's tooling, not the store's app, and nothing in the app connects to either. The one Miro use is the architecture board on the store's own account (docs/HANDOVER.md): a drawing of the diagrams in docs/ARCHITECTURE.md, which stays the source, redrawn from it when it changes |
 | **Supabase Edge Functions** | The API routes on Vercel cover it; splitting server code across two runtimes doubles where to look when something breaks |
 | **Supabase Realtime** | The notification bell polls on navigation, focus, open and timer. Polling is enough for one store and has fewer states to get wrong |
 | **pgvector** | Deferred by design until the store's data outgrows one prompt. Ask-the-store passes context directly today and that works at tens of vendors |

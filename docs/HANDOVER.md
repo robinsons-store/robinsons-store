@@ -1,202 +1,81 @@
-# Handover: every account owned by the store
+# Accounts: what the store owns, and every secret the app reads
 
-Status: PROPOSED, 2026-10-24. Owner: the developer. Approver: Ravi Kiran (store owner).
+Status: ACCEPTED, 2026-10-30. Owner: the developer. Approver: Ravi Kiran (store owner).
 Decision record: [docs/adr/ADR-001-the-store-owns-every-account.md](adr/ADR-001-the-store-owns-every-account.md).
 
-**The store owns its domain and now has its own admin mailbox. Every other account the app
-runs on (database, hosting, code, AI key, Slack app) is still held by the developer, and two
-of them are on plans that put the store at risk.** This file is the register of what the
-store will own and under which exact names, the order to move each one, and the checks that
-prove each move landed. Evidence tags follow `.claude/skills/robinsons-store/references/standards.md`:
-`[R]` read from a file, `[V-run]` read live this session, `[V-src]` from vendor
-documentation this session, `[D]` reported and to be confirmed by a named person, `[J-open]`
-believed but unchecked, `[Q]` open question with an owner.
-
-Companion files: docs/owner-notes/handover-checklist.md (every task as numbered, tickable steps, labelled with which account does each), docs/PLATFORM.md (every service and why), docs/AGENTS.md (the AI agents and
-whose key each runs on), ONBOARDING.md (the forms for the person taking over),
-docs/ENVIRONMENTS.md (dev and production), docs/SUPABASE_SETUP.md (the database connection
-secret), docs/DOMAIN_EMAIL.md (the domain and mailboxes).
+**The move to the store's accounts is done: the hosting and the code now sit under the
+store, not under a person, and production and dev each have their own database
+(docs/ENVIRONMENTS.md). What is left is finishing: two paid plans are unconfirmed and the
+original keys have not been reissued.** This file is the register of each account, every secret and
+variable the code reads, and the items still open. Evidence tags follow
+`.claude/skills/robinsons-store/references/standards.md`.
 
 ## The rule
 
 Every account is opened with **`admin@robinsonsgeneralstore.ca`**, paid with the **store's
 card**, and owned by the store's company, **1000476363 ONTARIO INC.**, 1061 Main St, Dorset,
 ON P0A 1E0 [R `docs/DOMAIN_EMAIL.md:29-30`]. People get the smallest role that lets them do
-their job and can be removed without anything breaking. A person's own email as the login for
-a store service is exactly what this removes.
+their job and can be removed without anything breaking. A new service gets a row here in the
+same change that adds it.
 
-## Progress
+## Who owns what, today
 
-A step is done when its check passes, not when the button is clicked.
-
-| Step | State | Check that closes it |
+| Service | What the store owns | State |
 |---|---|---|
-| 0. Store admin mailbox | **BUILT** 2026-10-18 [D: Vianet mailbox list, as shared by the developer; Ravi Kiran to confirm in the panel] | Listed on Vianet, 1000MB quota |
-| 0. Store password vault, two-factor on every account | TARGET | Every login and recovery code below is in the vault |
-| 1. Domain renewal confirmed | TARGET, overdue since 2026-10-16 | New expiry date written in docs/DOMAIN_EMAIL.md |
-| 1. Watchdog checks the store's domain | TARGET | GitHub variable `PRODUCTION_URL` = `https://app.robinsonsgeneralstore.ca` |
-| 2. Supabase owned by admin@, on Pro | TARGET. Plan is `free` today [V-run, Supabase get_organization, 2026-10-24] | Organization plan reads `pro`; a backup is listed the next day |
-| 3. Vercel project on the store's team, on Pro | TARGET. Project is on the developer's personal team today [V-run, Vercel get_project `accountId`, 2026-10-24] | Project `accountId` is the store team's id; a production deploy is Ready there |
-| 4. Repository in the store's GitHub organization | TARGET | Repository URL is under the store's organization; Vercel builds from it |
-| 5. Keys reissued under the store | TARGET | Old Anthropic key and old `VERCEL_TOKEN` revoked |
-| 6. Dev environment on the store's accounts | TARGET | `develop` branch exists; dev migration gate prints a non-zero length |
+| Vianet (domain, mail) | Account 1000476363 ONTARIO INC., customer ID 616900 [R `docs/DOMAIN_EMAIL.md:29`]; mailbox admin@ | BUILT |
+| Vercel | Team **robinsons-store** (slug `robinsons-store1`, id `team_pEEbrKESMFC4HpgFi3pa26P8`), project `robinsons-store` (id `prj_sDGCXtpmypc0d3qw0ylbO1rnWqeo`) [V-run, Vercel list_teams and get_project, 2026-10-30]. Domains `app.robinsonsgeneralstore.ca` (verified) and `robinsons-store.vercel.app` [V-run, list_project_domains, 2026-10-30] | BUILT. Plan not readable from here (A-01) |
+| GitHub | Repository **`robinsons-store/robinsons-store`**; `main` is protected [V-run, GitHub list_branches, 2026-10-30]. The owner is admin@'s GitHub account, not an organization [D: the developer, 2026-10-25] | BUILT, with A-05 open |
+| Supabase | Organization `robinsons-store` (plan `free` [V-run, Supabase get_organization, 2026-10-30]) holding project `robinsons-store` (ref `mhcjreqvvhnrtgwtuwvr`, the live database) and project `robinsons-store-dev` (ref `wqxcmchxkdhigacvxgad`, seed data only, docs/ENVIRONMENTS.md), both Canada Central. admin@ is a member [D: the developer, 2026-10-25; confirm the Owner role on the Team page] | PARTIAL: still on Free (A-01) |
+| Anthropic | Console organization for the store [Q: Ravi Kiran, confirm it exists] | PARTIAL: the key in Vercel is the original from 2026-05-29 (A-02) |
+| Slack | Workspace robinsonsgeneralstore.slack.com [R `docs/DOMAIN_EMAIL.md:18`] and the bot app from `docs/slack-app-manifest.yml` | PARTIAL. `SLACK_BOT_TOKEN` and `SLACK_REQUEST_CHANNEL` are set; the token belongs to this workspace: the first request's run read the channel, posted and updated its card [V-run, Actions run 41127237310, 2026-10-30]. That run's build stopped because the Anthropic account behind `ANTHROPIC_API_KEY` is out of credit. Primary Owner not recorded (A-07) |
+| Resend | Not opened. The daily due-date email stays off until it is | TARGET |
+| Google | The store's own Google account, which owns the live sheets [R `docs/SYNC_PLAN.md:67`] | BUILT. Address not recorded (A-07) |
+| Miro | The store's board **"Robinsons store architecture"** shows the nine diagrams of docs/ARCHITECTURE.md, built in Miro from the doc's Mermaid with the same colour key and named by section and date. The six older diagrams and their labels moved to the separate board **"Robinsons store architecture, archive"** [R pr/81:docs/ARCHITECTURE.md:695]. docs/ARCHITECTURE.md stays the source; redraw the matching board diagram whenever its Mermaid changes | BUILT. ARCH-12 closed 2026-10-30 |
+| Password vault | Bitwarden or 1Password, opened with admin@ | TARGET (A-03) |
 
-## The target: what the store will own, and under which names
+## Still open
 
-Enter these exactly. Where a name has to be unique on the service and might be taken, the
-fallback is in brackets; record the name actually used in the last column.
-
-| Service | Account the store owns | Sign-in | Billing | Developer's role afterwards | Name actually used |
-|---|---|---|---|---|---|
-| Vianet (domain, mail) | Account **1000476363 ONTARIO INC.**, customer ID 616900 [R `docs/DOMAIN_EMAIL.md:29`] | Contact address: admin@ | Unchanged | None | (already the store's) |
-| Password vault | Bitwarden or 1Password organization **"Robinson's General Store"** [Q: Ravi Kiran, which product] | admin@ | Store card | None | |
-| Supabase | Keep organization **`robinsons-store`** (id `idijiwqgwlsebgpkfzry`), project **`robinsons-store`** (ref `mhcjreqvvhnrtgwtuwvr`, Canada Central) [V-run, list_projects, 2026-10-24] | admin@ as **Owner** | Pro, $25 a month, store card, billing email admin@ | **Developer**: reads the organization, works in the project, cannot change settings or billing [V-src, supabase.com/docs/guides/platform/access-control, 2026-10-24] | (keeps its name) |
-| Vercel | New team **"Robinson's General Store"**, slug `robinsons-general-store` (`robinsons-store-team`); project `robinsons-store` (id `prj_sDGCXtpmypc0d3qw0ylbO1rnWqeo`) moves in | admin@ as **Owner** | Pro, $20 per seat a month, store card | **Member** while work continues, then removed | |
-| GitHub | New user **`robinsons-store-admin`** for admin@, which creates organization **`robinsons-general-store`** (`robinsonsgeneralstore`); repository `robinsons-store` moves in | admin@'s GitHub user as **Owner** | Free, billing email admin@ | **Owner** only for the transfer, then **outside collaborator, Write** | |
-| Anthropic | Console organization **"Robinson's General Store"** | admin@ | Store card, monthly spend limit [Q: Ravi Kiran, the limit] | None | |
-| Slack | Workspace **robinsonsgeneralstore.slack.com** [R `docs/DOMAIN_EMAIL.md:18`]; the bot app from `docs/slack-app-manifest.yml` | admin@ as **Primary Owner** of the workspace [Q: the developer, who is Primary Owner today] and a collaborator on the app | Free | Member | |
-| Resend | New account, domain robinsonsgeneralstore.ca verified | admin@ | Free tier | None | |
-| Google | The store's existing Google account, which owns the live sheets [R `docs/SYNC_PLAN.md:67`] | [Q: Ravi Kiran, the account's address] | Unchanged | Viewer on the shared sheets only | (already the store's) |
-
-## The order, and why
-
-Mailbox and vault first, because every sign-up below needs the mailbox and every password
-lands in the vault. The database before the hosting, because backups protect the one thing
-that cannot be rebuilt. Hosting and code together, because moving either one breaks the link
-between them until both have moved. Dev last and straight onto the store's accounts, so it
-never needs moving.
-
-### Step 0. Mailbox and vault (Ravi Kiran or the developer, 15 minutes)
-
-1. BUILT: `admin@robinsonsgeneralstore.ca` exists. Open it through the Vianet account panel
-   (https://myaccount.vianet.ca/), or a mail app with incoming `mail.vianet.ca`, outgoing
-   `smtp.vianet.ca` port 587, the full address as username [J-open: settings from Vianet's
-   support page as indexed by a search engine 2026-10-18; the page itself could not be opened
-   from here. Kill condition: the mail app fails to connect].
-2. Create the store vault with admin@. Save admin@'s own password in it first.
-3. Write the vault's master password on paper; keep it at the store, with a second copy held
-   by Ravi Kiran.
-
-### Step 1. The domain (Ravi Kiran, 5 minutes)
-
-1. Vianet panel: read the domain's expiry date and auto-renew state. Write them in
-   docs/DOMAIN_EMAIL.md. It was due 2026-10-16 [R `docs/DOMAIN_EMAIL.md:45`].
-2. Set the GitHub variable `PRODUCTION_URL` to `https://app.robinsonsgeneralstore.ca`. Today
-   the watchdog falls back to the vercel.app address [R `.github/workflows/post-deploy-watch.yml:54`],
-   which keeps passing even if the domain lapses.
-
-### Step 2. Supabase (15 minutes)
-
-Keep the organization; change who owns it. Moving the project would change nothing the store
-needs and would put the connection strings at risk.
-
-1. The developer, signed in with the account that owns organization `robinsons-store`, opens
-   Team and invites `admin@robinsonsgeneralstore.ca` as **Owner**. Only an Owner can add
-   owners or move projects; an Administrator cannot [V-src, access-control, 2026-10-24].
-2. In a private window, open the invite from the admin@ inbox and follow its link; create the
-   admin@ Supabase account there (password into the store vault), then accept.
-3. As admin@: add the store card, upgrade to **Pro**, set the billing email to admin@.
-4. The developer stays **Owner** until a second store-controlled owner exists (ADR-001,
-   condition 2), then drops to **Developer** at close-out.
-5. Reset the database password (Project settings, Database). Nothing in the app reads it.
-   Rebuild `SUPABASE_DB_URL` as docs/SUPABASE_SETUP.md says (session pooler, port 5432) and
-   replace the GitHub secret.
-
-Until Pro is on, run the app's Export screen and save the workbook to the store's Google
-Drive. It is a record, not a restore: it leaves out the uploaded invoice images.
-
-### Step 3. Vercel (20 minutes)
-
-1. Sign up at Vercel as admin@. Create the team from the table, on **Pro**, store card.
-2. The developer, in project `robinsons-store`, Settings, General, **Transfer**, picks the
-   store's team. A transfer is a request that the receiving team accepts [V-src,
-   vercel.com/docs/rest-api/projects/accept-project-transfer-request, 2026-10-24].
-3. As admin@: accept.
-4. Check in the store team's copy. The vendor documentation read here does not say which
-   settings travel with a project, so each one is checked rather than assumed [J-open, kill
-   condition: any of these is missing after the transfer]:
-   - Domains lists `app.robinsonsgeneralstore.ca`;
-   - Environment Variables lists every name in the register below;
-   - Functions, Function Region is **Montreal (yul1)**;
-   - Cron Jobs lists `/api/alerts`.
-5. Not moving with it: the **AgentMail** Marketplace install (reinstall on the store team when
-   email intake is built [R `docs/PLATFORM.md`]), and **`VERCEL_TOKEN`**, which belongs to
-   the developer's account. Create a new token as admin@, scoped to the store team, and
-   replace the GitHub secret.
-
-If a deploy shows as blocked after the move because its commit author is not a team member,
-add whoever merges pull requests as a member [J-open, kill condition: a deploy is blocked for
-any other reason].
-
-### Step 4. GitHub (20 minutes)
-
-1. Sign up at GitHub as admin@ with the username from the table. Turn on two-factor.
-2. As that user, create the **Free** organization from the table, billing email admin@.
-3. Invite the developer's GitHub account to the organization as **Owner**. The developer
-   needs permission to create repositories there to transfer one in [J-open, kill condition:
-   the transfer dialog does not offer the organization].
-4. The developer: repository Settings, General, Danger Zone, **Transfer**, to the store's
-   organization.
-5. In the moved repository, Settings, Secrets and variables, **Actions**: compare the names
-   against the register below and re-add anything missing. A missing secret does not fail a
-   run; the workflow reports `skipped` and goes green [R `docs/SUPABASE_SETUP.md:76-78`].
-6. Install the Vercel GitHub app on the organization and point the store's Vercel project at
-   the moved repository, production branch `main`. Merge a small change and confirm a
-   production deploy appears.
-7. Install the Claude GitHub app on the organization so the Slack autopilot and future Claude
-   sessions can reach the repository (docs/AGENTS.md).
-8. Settings, Actions, General, Workflow permissions: allow GitHub Actions to create and
-   approve pull requests. The promotion workflow needs it; merging stays human.
-9. Reduce the developer to **outside collaborator, Write** once a second store-controlled
-   owner exists (ADR-001, condition 2).
-
-### Step 5. Keys reissued under the store (20 minutes)
-
-| Key | Get it as admin@ from | Put it in | Then |
+| ID | Item | Owner | Blocking? |
 |---|---|---|---|
-| Anthropic | Console, Create Key | Vercel `ANTHROPIC_API_KEY` (production and preview), GitHub secret `ANTHROPIC_API_KEY` | Redeploy, capture one invoice, revoke the old key |
-| Vercel token | Account settings, Tokens, scoped to the store team | GitHub secret `VERCEL_TOKEN` | Run the Vercel diagnose workflow once |
-| Slack bot and webhook | The app from `docs/slack-app-manifest.yml` in the store workspace | GitHub secrets `SLACK_BOT_TOKEN`, `SLACK_WEBHOOK_URL`; variable `SLACK_REQUEST_CHANNEL` | Actions, "Say something in Slack", run once |
-| Resend | Verify robinsonsgeneralstore.ca (DNS records by phone to Vianet hosting) | Vercel `RESEND_API_KEY`, `ALERT_EMAIL_FROM`, `ALERT_EMAIL_TO` | Call `/api/alerts` with the cron secret |
-| `CRON_SECRET` | Make a new long random string | Vercel **and** GitHub, the same value | Watchdog and daily email both send it |
-| Supabase service role | Project settings, API | Vercel `SUPABASE_SERVICE_ROLE_KEY` | The Team page can create staff logins |
-
-### Step 6. The dev environment, on the store's accounts
-
-Steps in docs/ENVIRONMENTS.md, Setting it up, with two changes: the dev database goes in a
-**second, Free organization** owned by admin@ so it adds no compute charge, and the guard
-`.github/scripts/distinct-databases.mjs` refuses any dev run whose connection string points
-at production [V-run, its 16 checks passed 2026-10-18]. Then create the `develop` branch.
+| A-01 | Confirm Supabase **Pro** ($25 a month, daily backups) and Vercel **Pro** ($20 a seat, licenses commercial use) on the store's card. Supabase read `free` on 2026-10-30 [V-run]; on Pro the dev project adds about $10 a month in compute [J-open]. Vercel's plan is not readable here; its billing API returned no charges for October [V-run, list_billing_charges, 2026-10-30], which is what Hobby looks like. See docs/PLATFORM.md risks 1 and 2 | Ravi Kiran | **Yes** |
+| A-02 | Reissue the keys under the store and revoke the originals: `ANTHROPIC_API_KEY` (Vercel and GitHub), `VERCEL_TOKEN` (a token that can see team `robinsons-store1`), a new `CRON_SECRET` set in both Vercel and GitHub | The developer, with admin@ | No |
+| A-03 | Pick the password vault, put admin@'s password and every recovery code in it | Ravi Kiran | No |
+| A-04 | Domain renewal was due 2026-10-16 and has not been seen. Write the new expiry in docs/DOMAIN_EMAIL.md | Ravi Kiran | **Yes**, for anything on the domain |
+| A-05 | The repository sits on a single GitHub account, which cannot have a second owner. Create an organization as that account and transfer the repository in, then reconnect Vercel's Git link | Ravi Kiran | No |
+| A-06 | Reduce the developer to the least role (Developer on Supabase, Member on Vercel, Write on GitHub) once a second store-controlled owner exists; remove the project's leftover `*.vercel.app` aliases from before the move | Ravi Kiran | No |
+| A-07 | Record the Slack Primary Owner, the store Google account's address, and the Anthropic monthly spend limit | Ravi Kiran | No |
+| A-08 | Delete the Lawson "PO Details.docx" from Drive. It holds a full card number in plain text | Ravi Kiran | No |
 
 ## Secrets and variables register
 
-Every name the code and workflows read [V-run, search of `process.env` in `src/` and of
-`secrets.` and `vars.` in `.github/workflows/`, 2026-10-18]. Values are never written here.
+Every name the code and workflows read. Values are never written here.
 
-**Vercel, project environment variables**
+**Vercel, project environment variables** [V-run, Vercel filter_project_envs, 2026-10-30]
 
-| Name | Issued by | Notes | Rotate if the developer leaves |
+| Name | Issued by | Set today, for | Notes |
 |---|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase | Public by design | No |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase | Public by design; the database policies protect the data | No |
-| `NEXT_PUBLIC_REQUIRE_AUTH` | Set by hand | `true` once login is enforced | No |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase | Server only, bypasses the policies | **Yes** |
-| `ANTHROPIC_API_KEY` | Anthropic | Also a GitHub secret | **Yes** |
-| `ANTHROPIC_MODEL` | Set by hand | Optional; the code defaults to `claude-sonnet-5` [R `src/app/api/extract/route.ts:80`] | No |
-| `AI_DAILY_CAP_PER_STORE` | Set by hand | Optional; AI calls per store per Ontario day, the code defaults to 100 [R `src/lib/aiUsage.ts:28`]. A change applies after a redeploy | No |
-| `CRON_SECRET` | Made up | Same value as the GitHub secret | **Yes** |
-| `RESEND_API_KEY`, `ALERT_EMAIL_FROM`, `ALERT_EMAIL_TO` | Resend, set by hand | Only when the daily email is wanted | Key only |
-| `SLACK_SIGNING_SECRET` | Slack app, Basic Information | NEW (ADR-006), not yet set. Ask in Slack: without it `/api/slack/events` refuses every request | **Yes** |
-| `SLACK_BOT_TOKEN` | Slack app | NEW in Vercel (ADR-006), not yet set; same value as the GitHub secret. Posts the answers | **Yes** |
-| `SLACK_REQUEST_CHANNEL` | Slack | NEW in Vercel (ADR-006), not yet set; the channel id the answers are given in, same as the GitHub variable | No |
-| `SLACK_STORE_ID` | Supabase, `store.id` | NEW (ADR-006), not yet set; which store a Slack question is answered about. Unset: "not set up" replies, no model call | No |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase | Production: the live project. Preview: the dev project | Public by design. Two separate entries since 2026-10-30, so a preview cannot reach the live database. Production ends `mhcjreqvvhnrtgwtuwvr`, Preview `wqxcmchxkdhigacvxgad` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase | Production: live. Preview: dev | Public by design; the database policies protect the data |
+| `NEXT_PUBLIC_REQUIRE_AUTH` | Set by hand | Production | `true` once login is enforced |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase | Production | Server only, bypasses the policies. Rotate if the developer leaves |
+| `ANTHROPIC_API_KEY` | Anthropic | Production, Preview | Also a GitHub secret. A-02 |
+| `ANTHROPIC_MODEL` | Set by hand | Production, Preview | Optional; the code defaults to `claude-sonnet-5` [R `src/app/api/extract/route.ts:80`] |
+| `AI_DAILY_CAP_PER_STORE` | Set by hand | Not set | Optional; the code defaults to 100 calls per store per Ontario day [R `src/lib/aiUsage.ts:28`] |
+| `CRON_SECRET` | Made up | **Not set** | Same value as the GitHub secret. A-02 |
+| `RESEND_API_KEY`, `ALERT_EMAIL_FROM`, `ALERT_EMAIL_TO` | Resend, set by hand | Not set | Only when the daily email is wanted |
+| `AGENTMAIL_API_KEY` | AgentMail | All | Installed, not wired in [R `docs/PLATFORM.md`] |
+| `POSTGRES_*`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_JWT_SECRET`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | The Supabase integration | Production | Written by the integration on 2026-07-31; the code reads none of them |
+| `SLACK_SIGNING_SECRET` | Slack app, Basic Information | **Not set** | NEW (ADR-006). Ask in Slack: without it `/api/slack/events` refuses every request. Rotate if the developer leaves |
+| `SLACK_BOT_TOKEN` | Slack app | **Not set** | NEW in Vercel (ADR-006); same value as the GitHub secret. Posts the answers. Rotate if the developer leaves |
+| `SLACK_REQUEST_CHANNEL` | Slack | **Not set** | NEW in Vercel (ADR-006); the channel the answers are given in, same as the GitHub variable |
+| `SLACK_STORE_ID` | Supabase, `store.id` | **Not set** | NEW (ADR-006); which store a Slack question is answered about. Unset: "not set up" replies, no model call |
 
 **GitHub, Actions repository secrets**
 
 | Name | Used by | Rotate if the developer leaves |
 |---|---|---|
 | `SUPABASE_DB_URL` | migrate, rls-audit | **Yes** (reset the database password) |
-| `SUPABASE_DB_URL_DEV` | migrate, once dev exists | Yes |
+| `SUPABASE_DB_URL_DEV` | migrate, on a push to `develop`. **Not set yet** (docs/ENVIRONMENTS.md step 2) | Yes |
 | `CRON_SECRET` | migrate, post-deploy-watch | **Yes** |
 | `SLACK_WEBHOOK_URL` | migrate, rls-audit, post-deploy-watch, slack-announce | **Yes** |
 | `SLACK_BOT_TOKEN` | slack-autopilot, slack-lifecycle | **Yes** |
@@ -209,8 +88,9 @@ Every name the code and workflows read [V-run, search of `process.env` in `src/`
 | Name | What |
 |---|---|
 | `PRODUCTION_URL` | The address the watchdog checks: `https://app.robinsonsgeneralstore.ca` |
-| `DEV_URL` | The dev site, once it exists |
-| `SLACK_REQUEST_CHANNEL` | The Slack channel ID the autopilot reads (accepted as a secret too) |
+| `DEV_URL` | The dev site, `https://robinsons-store-git-develop-robinsons-store1.vercel.app`. Set 2026-10-30 [V-run, `gh variable list`] |
+| `VERCEL_TEAM_ID` | Optional. The team the Vercel workflows ask; unset, they use `team_pEEbrKESMFC4HpgFi3pa26P8` [R `.github/workflows/vercel-diagnose.yml:39`] |
+| `SLACK_REQUEST_CHANNEL` | The Slack channel ID the autopilot reads (accepted as a secret too). Set 2026-10-30 to the workspace's general channel, where the bot is a member [V-run, `gh variable list`, 2026-10-30] |
 | `SLACK_REQUIRE_MENTION` | Optional. `false` only for a requests-only channel |
 
 **Slack app, scopes and events** (the app from `docs/slack-app-manifest.yml`)
@@ -220,51 +100,33 @@ Every name the code and workflows read [V-run, search of `process.env` in `src/`
 | Scopes `channels:history`, `chat:write`, `reactions:read`, `reactions:write` | The build sweep and its status card | Set |
 | Scope `app_mentions:read`, Event Subscriptions on with bot event `app_mention`, Request URL `https://<the app's address>/api/slack/events` | Ask in Slack (ADR-006). Changing scopes needs the app reinstalled to the workspace | NEW, not yet set; the manifest is unchanged until approved |
 
-## Proof the move worked
+## When someone leaves
 
-- [ ] `https://app.robinsonsgeneralstore.ca/api/health` answers `ok: true`.
-- [ ] `curl -sD- -o /dev/null https://app.robinsonsgeneralstore.ca/api/health | grep -i x-vercel-id` shows `yul1` as the second field: the header reads `<edge>::<function region>::<id>`, and the first field is the edge nearest the caller (before the move, 2026-10-24: `cle1::yul1::...`).
-- [ ] A merge to main produces a production deploy on the **store's** Vercel team.
-- [ ] Actions, Apply database scripts, run by hand: the gate prints a non-zero secret length.
-- [ ] Actions, "Say something in Slack", posts in the channel.
-- [ ] Post-deploy watch runs green against the custom domain.
-- [ ] The owner signs in; a staff account signs in and sees no dollar figures.
-- [ ] Supabase, Database, Backups lists a backup from the day after the upgrade.
-- [ ] One invoice photo goes through Capture on the store's Anthropic key.
-
-## Close-out
-
-1. Remove the developer from what they no longer need: the Vercel team, the Supabase
-   organization (or keep Developer), the Slack app's collaborators, Drive shares. GitHub stays
-   Write while work continues.
-2. If the developer is leaving entirely, rotate everything marked **Yes** above.
-3. Delete the Lawson "PO Details.docx" from Drive. It holds a full card number in plain text.
-4. Record the handover date in docs/STATUS.md and fill in the "Name actually used" column.
-
-## Open items
-
-| ID | Item | Owner | Blocking? |
-|---|---|---|---|
-| HO-01 | Domain renewal not seen; was due 2026-10-16 | Ravi Kiran | **Yes**, for anything on the domain |
-| HO-02 | Which vault product | Ravi Kiran | Yes, for Step 0 |
-| HO-03 | Anthropic monthly spend limit | Ravi Kiran | No |
-| HO-04 | Who is Primary Owner of the Slack workspace today | The developer | No, for Steps 2 to 4 |
-| HO-05 | The store Google account's address | Ravi Kiran | No |
-| HO-06 | Second store-controlled GitHub owner (ADR-001 condition 2) | Ravi Kiran | No, until close-out |
-| HO-07 | The handover commits sit on a branch not yet pushed, because the session's GitHub connection is not the developer's personal account | The developer | No |
+Remove them from the Vercel team, the Supabase organization, the GitHub repository, the
+Slack app's collaborators and the Drive shares. If it is the developer, rotate everything
+marked **Yes** above.
 
 ## How this maps to the rest of the docs
 
 Why this is the rule: [ADR-001](adr/ADR-001-the-store-owns-every-account.md). Service
-inventory and plan risks: docs/PLATFORM.md. Which agent runs on which key: docs/AGENTS.md. The
-new member's forms and first week: ONBOARDING.md. Domain and mailboxes: docs/DOMAIN_EMAIL.md.
+inventory and plan risks: docs/PLATFORM.md. Dev and production: docs/ENVIRONMENTS.md. Which
+agent runs on which key: docs/AGENTS.md. The new member's forms: ONBOARDING.md. Domain and
+mailboxes: docs/DOMAIN_EMAIL.md.
 
-**Basis: 9 claims checked this session (2026-10-24), 8 confirmed, 0 killed, 4 sources.**
-Confirmed: Supabase organization plan `free` and project ref and region (Supabase API);
-Vercel project id, team id and domains (Vercel API); Supabase organization roles and the
-Owner-only rights (Supabase access-control docs); Vercel transfer by accepted request (Vercel
-REST docs); the watchdog's fallback address (`.github/workflows/post-deploy-watch.yml:54`);
-the default model (`src/app/api/extract/route.ts:80`). One claim from the 2026-10-18 version,
-that environment variables and domains travel with a Vercel project, could not be confirmed
-from the documentation reachable here and is now `[J-open]` with a check in Step 3. Sources:
-Supabase Management API, Vercel API, Supabase documentation, Vercel documentation.
+**Basis: 11 claims checked this session (2026-10-30), 11 confirmed, 0 killed, 3 sources.**
+Confirmed: the Vercel team name, slug and id; the project on that team; both domains and
+the custom one verified; every Vercel variable name and its targets, including Preview on the
+live database URL until it was removed from Preview the same day, and no `CRON_SECRET`; the Anthropic key unchanged since 2026-05-29; no
+October charges on the Vercel team; the repository at `robinsons-store/robinsons-store` with
+`main` protected; `develop` created the same day; the Supabase plan `free` and both projects.
+admin@'s Supabase role stays `[D]`: it is not readable from the Supabase API. Sources: Vercel API, GitHub API, Supabase API.
+Added later the same day, branch claude/slack-autopilot-review: 3 claims checked, 2
+confirmed, 1 killed. Confirmed: `SLACK_BOT_TOKEN` and `ANTHROPIC_API_KEY` are GitHub secrets;
+`SLACK_REQUEST_CHANNEL` is neither a variable nor a secret. Killed: the Slack row's BUILT,
+now PARTIAL, because the request loop has never passed its first step. Sources: GitHub CLI,
+Actions run logs.
+
+**Basis (Miro update, 2026-10-30): 3 claims checked, 3 confirmed, 0 killed, 1 source.**
+The current board, archive and redraw rule match ARCH-12 in
+docs/ARCHITECTURE.md (ARCH-12, merged in #81). This is a document comparison, not a new
+live board check.

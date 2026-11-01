@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, claude/great-johnson-CFSbi]
+    branches: [main, develop]  # develop is where app changes land first (docs/ENVIRONMENTS.md)
   pull_request:
-    branches: [main]
+    branches: [main, develop]
   # On demand, for any branch. Added 2026-08-06 after a push landed (Vercel deployed it)
   # without GitHub creating a CI run at all, and there was no way to ask for one: the gates
   # could only be re-run by pushing another commit. A pull request with no CI result looks
@@ -46,6 +46,16 @@ jobs:
           npx tsc -p scripts/extractvalidate-check/tsconfig.json
           cp scripts/extractvalidate-check/check.js scripts/extractvalidate-check/out/
           node scripts/extractvalidate-check/out/check.js
+      # Module checks by convention: every scripts/*-check folder with a run.sh runs here,
+      # in name order, stopping at the first failure. A new check adds its own run.sh
+      # (contract in scripts/vendorfields-check/README.md) and needs no edit to this file.
+      - name: Module checks
+        run: |
+          for f in scripts/*-check/run.sh; do
+            echo "::group::$f"
+            bash "$f"
+            echo "::endgroup::"
+          done
       # Ask answers: every vendor the answer names must be in what the prompt carried.
       - name: Ask grounding checks
         run: |
@@ -85,24 +95,22 @@ jobs:
       # watchdog should speak rather than repeat itself.
       - name: Automation rules
         run: |
-          node .github/scripts/health-notify.test.mjs
+          # Every .github/scripts/*.test.mjs runs, in name order, stopping at the first
+          # failure, so a new test needs no edit here.
+          for f in .github/scripts/*.test.mjs; do
+            echo "== $f"
+            node "$f"
+          done
           node --check .github/scripts/classify-change.mjs
           node --check .github/scripts/health-check.mjs
           node --check .github/scripts/health-notify.mjs
           # The Jira autopilot is parked, not deleted: a future board can wake it up. Its
-          # tests and syntax checks keep running so it cannot rot into something that no
-          # longer works by the time somebody needs it.
-          node .github/scripts/jira-find-work.test.mjs
-          node .github/scripts/jira-transition.test.mjs
-          node .github/scripts/distinct-databases.test.mjs
+          # tests (in the loop above) and syntax checks keep running so it cannot rot into
+          # something that no longer works by the time somebody needs it.
           node --check .github/scripts/jira-comment.mjs
           node --check .github/scripts/jira-find-work.mjs
           node --check .github/scripts/jira-transition.mjs
-          node .github/scripts/slack-find-work.test.mjs
-          node .github/scripts/slack-intent.test.mjs
           node --check .github/scripts/slack-find-work.mjs
-          node .github/scripts/slack-status.test.mjs
-          node .github/scripts/slack-lifecycle-stage.test.mjs
           node --check .github/scripts/slack-say.mjs
           node --check .github/scripts/slack-status.mjs
           node --check .github/scripts/slack-lifecycle-stage.mjs

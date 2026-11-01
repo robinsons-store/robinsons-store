@@ -174,5 +174,95 @@ for (const d of ["Grocery", "Hardware", "DryGoods & Lakeside", "Bakery"]) {
 }
 t("vendorSelect fetches the new column", R.vendorSelect().includes("specializes_in"));
 
+// THE DEPARTMENT FIELDS SCREEN, 2026-10-25. Sections take their department's questions,
+// and the owner's ticks beat the code list everywhere except the locked questions and the
+// money gate.
+const D = require("./departments.js");
+const C = require("./fieldChoices.js");
+const TREE = [
+  { id: "dry", name: "DryGoods & Lakeside", parent_department_id: null },
+  { id: "clo", name: "Clothing", parent_department_id: "dry" },
+  { id: "gif", name: "Gifts", parent_department_id: "dry" },
+  { id: "hw", name: "Hardware", parent_department_id: null },
+  { id: "gc", name: "Garden Center", parent_department_id: "hw" },
+  { id: "bak", name: "Bakery", parent_department_id: null },
+  { id: "orphan", name: "Stockroom", parent_department_id: "not-loaded" },
+  { id: "loopA", name: "Loop A", parent_department_id: "loopB" },
+  { id: "loopB", name: "Loop B", parent_department_id: "loopA" }
+];
+const keysFor = (name, opts = {}) => R.fieldsForEntry(name, { showMoney: true, ...opts }).map(f => f.key).sort().join(",");
+
+for (const [id, parent] of [["clo", "DryGoods & Lakeside"], ["gif", "DryGoods & Lakeside"], ["gc", "Hardware"]]) {
+  const section = TREE.find(d => d.id === id).name;
+  const top = D.fieldDepartment(id, TREE);
+  t(`${section} resolves to ${parent}`, !!top && top.name === parent, top ? top.name : "null");
+  t(`${section} is asked exactly ${parent}'s vendor questions`, !!top && keysFor(top.name) === keysFor(parent));
+}
+// The gap this closes: by its own name a section matches nothing and is asked everything.
+t("Clothing by its own name would be asked every question",
+  keysFor("Clothing").split(",").length === R.VENDOR_FIELDS.length);
+t("a top-level department answers with itself", D.fieldDepartment("bak", TREE).id === "bak");
+t("a section whose parent did not load answers with itself", D.fieldDepartment("orphan", TREE).id === "orphan");
+t("a parent loop stops instead of spinning", ["loopA", "loopB"].includes((D.fieldDepartment("loopA", TREE) || {}).id));
+t("an id not in the list, or no id, is null",
+  D.fieldDepartment("nope", TREE) === null && D.fieldDepartment(null, TREE) === null);
+
+const ROWS = [
+  { department_id: "bak", form: "vendor", field_key: "products_we_carry", asked: true },
+  { department_id: "bak", form: "vendor", field_key: "phone", asked: false },
+  { department_id: "bak", form: "vendor", field_key: "name", asked: false },
+  { department_id: "bak", form: "vendor", field_key: "status", asked: false },
+  { department_id: "bak", form: "vendor", field_key: "minimum_order", asked: true },
+  { department_id: "bak", form: "invoice", field_key: "po_number", asked: true },
+  { department_id: "hw", form: "vendor", field_key: "email", asked: false }
+];
+const bak = C.choicesFor(ROWS, "bak", "vendor");
+const EMPTY = C.choicesFor([], "bak", "vendor");
+
+t("no rows means the code list, department by department",
+  Object.keys(OWNER).every(d => keysFor(d, { choices: EMPTY }) === keysFor(d)));
+t("a tick adds a question the code list leaves out",
+  R.asksFor("Bakery", "products_we_carry", { showMoney: true, choices: bak }) === true);
+t("an untick removes a question the code list asks",
+  R.asksFor("Bakery", "phone", { showMoney: true, choices: bak }) === false);
+t("a locked question ignores an untick: name",
+  R.asksFor("Bakery", "name", { showMoney: true, choices: bak }) === true);
+t("a locked question ignores an untick: status",
+  R.asksFor("Bakery", "status", { showMoney: true, choices: bak }) === true);
+t("the locked vendor questions are exactly name and status",
+  R.VENDOR_FIELDS.filter(f => f.locked).map(f => f.key).sort().join(",") === "name,status");
+t("every locked question is asked of every department by default",
+  R.VENDOR_FIELDS.filter(f => f.locked).every(f => f.departments === "all"));
+t("the money gate beats a tick",
+  R.asksFor("Bakery", "minimum_order", { showMoney: false, choices: bak }) === false);
+t("a ticked money question is asked of a role that sees money",
+  R.asksFor("Bakery", "minimum_order", { showMoney: true, choices: bak }) === true);
+t("choices stay in their own form", !bak.has("po_number"));
+t("choices stay in their own department",
+  R.asksFor("Bakery", "email", { showMoney: true, choices: bak }) === true &&
+  R.asksFor("Hardware", "email", { showMoney: true, choices: C.choicesFor(ROWS, "hw", "vendor") }) === false);
+t("null department ignores choices, so the add-every-question button still adds every one",
+  keysFor(null, { choices: bak }).split(",").length === R.VENDOR_FIELDS.length);
+// The form draws with asksFor and validates with fieldsForEntry and hiddenFieldCount. Under
+// choices they must still agree for every field, in both money roles, or a department gets
+// a mandatory box that is not on its screen.
+for (const showMoney of [true, false]) {
+  const entryKeys = R.fieldsForEntry("Bakery", { showMoney, choices: bak }).map(f => f.key);
+  t(`asksFor and fieldsForEntry agree under choices (showMoney=${showMoney})`,
+    R.VENDOR_FIELDS.every(f => R.asksFor("Bakery", f.key, { showMoney, choices: bak }) === entryKeys.includes(f.key)));
+}
+t("hiddenFieldCount follows choices",
+  R.hiddenFieldCount("Bakery", { showMoney: true, choices: bak }) ===
+  R.VENDOR_FIELDS.length - keysFor("Bakery", { choices: bak }).split(",").length);
+t("asksByDefault is the code list alone",
+  R.asksByDefault("Bakery", "products_we_carry") === false && R.asksByDefault("Bakery", "phone") === true);
+// RULE 1 still holds under choices: unticking a question never hides a saved answer.
+const bakeryPhone = { name: "X", status: "active", phone: "705-555-0100", department: { name: "Bakery" } };
+t("RULE 1: an unticked question still SHOWS its saved answer",
+  R.visibleFacts(bakeryPhone, { showMoney: true, choices: bak }).some(f => f.field.key === "phone"));
+t("visibleFacts labels with the department the caller resolved",
+  (R.visibleFacts({ name: "X", status: "active", rep_name: "Sam", department: { name: "Repairs" } },
+    { showMoney: true, departmentName: "Property Maintenance" }).find(f => f.field.key === "rep_name") || {}).label === "Technician name");
+
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);

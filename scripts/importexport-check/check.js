@@ -34,7 +34,7 @@ function fakeDb(tables, opts = {}) {
         const n = requests++;
         if (opts.beforeRequest && opts.beforeRequest[n]) opts.beforeRequest[n](tables);
         log.push({ table, op: "select", q });
-        if (opts.fail === table) return Promise.resolve({ data: null, error: { message: "boom" } }).then(ok, bad);
+        if (opts.fail === table) return Promise.resolve({ data: null, error: opts.error || { message: "boom" } }).then(ok, bad);
         let out = tables[table].filter((r) => q.filters.every((f) => f(r)));
         if (q.order) out.sort((x, y) => (x[q.order.c] < y[q.order.c] ? -1 : x[q.order.c] > y[q.order.c] ? 1 : 0) * q.order.dir);
         out = out.slice(0, Math.min(q.limit == null ? 1000 : q.limit, 1000));
@@ -158,6 +158,14 @@ async function main() {
   let threw = "";
   try { await readTable(fakeDb({ tax_rules: [] }, { fail: "tax_rules" }), "tax_rules", (q) => q); } catch (e) { threw = e.message; }
   t("a database error throws with the table named", threw === "tax_rules: boom", threw);
+
+  for (const code of ["42P01", "PGRST205", "57014", undefined]) {
+    const db = fakeDb({ department_field: [] }, { fail: "department_field", error: { message: "read failed", code } });
+    let error;
+    try { await readTable(db, "department_field", (q) => q.eq("store_id", "s1")); } catch (e) { error = e; }
+    t(`department field read failure preserves ${code || "an absent code"}`,
+      error instanceof Error && error.message === "department_field: read failed" && error.code === code);
+  }
 
   // ---- Paging edges, fetchAllByKey directly ----
   const fullDb = fakeDb({ t: ids.slice(0, 1000).map((id) => ({ id })) });

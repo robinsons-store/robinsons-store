@@ -56,11 +56,9 @@ Confirm auto-renew is on, or renew it manually. This is the single highest-value
 five-minute job on the whole list.
 
 **2026-10-18:** the date has passed. Auto-renew was confirmed on, so it most likely renewed,
-but nobody has seen the renewal, and nothing automated would notice a lapse: the post-deploy
-watchdog checks `PRODUCTION_URL`, which falls back to robinsons-store.vercel.app when unset.
-Check the Vianet panel, write the new expiry date here, and set `PRODUCTION_URL` to
-https://app.robinsonsgeneralstore.ca so the next lapse fails a check (docs/HANDOVER.md
-Step 1).
+but nobody has seen the renewal. `PRODUCTION_URL` has been set to
+https://app.robinsonsgeneralstore.ca since 2026-10-25, so the watchdog now fails if the domain
+lapses. Check the Vianet panel and write the new expiry date here (docs/HANDOVER.md, A-04).
 
 ## Mailboxes: 6 of 10 used (admin@ added 2026-10-18)
 

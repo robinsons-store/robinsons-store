@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Status | PROPOSED, 2026-10-24 |
+| Status | ACCEPTED, 2026-10-24; carried out 2026-10-25 (hosting and code under the store). What is left is tracked in docs/HANDOVER.md, "Still open" |
 | Proposer | The developer |
 | Deciders | Ravi Kiran, store owner (approver) |
-| Technical owner | Whoever holds the admin@ vault after handover |
+| Technical owner | Whoever holds the admin@ vault |
 | Supersedes | Nothing. First decision record in this repository |
 
 ## Context
@@ -47,13 +47,12 @@ These are commitments that come with the decision and are tracked as delivery it
 docs/HANDOVER.md.
 
 1. The admin@ password and every recovery code live in a vault the store owns, with the
-   master password held on paper at the store and by Ravi Kiran (HO-02).
+   master password held on paper at the store and by Ravi Kiran (A-03).
 2. Each Owner-level account has a **second** store-controlled owner before the developer's
-   owner rights are removed, so one lost login cannot lock the store out (HO-06).
+   owner rights are removed, so one lost login cannot lock the store out (A-05, A-06).
 3. Every secret tied to a person's account (`VERCEL_TOKEN` always; the rest if the developer
-   leaves) is reissued under the store and the old one revoked (HANDOVER Step 5).
-4. The move is proven by checks, not clicks: the "Proof the move worked" list in
-   docs/HANDOVER.md passes in full.
+   leaves) is reissued under the store and the old one revoked (A-02).
+4. Both plans in ruling 4 are on the store's card (A-01).
 
 ## Consequences
 
@@ -85,7 +84,7 @@ Benefits:
 
 ## Related
 
-docs/HANDOVER.md (the register, steps and checks), docs/PLATFORM.md (the two plan risks),
+docs/HANDOVER.md (the register and what is still open), docs/PLATFORM.md (the two plan risks),
 docs/DOMAIN_EMAIL.md (the store's Vianet account), docs/AGENTS.md (which agents run on which
 key), ONBOARDING.md (access for the next person).
 
@@ -94,3 +93,9 @@ Confirmed by reading the Supabase organization plan and the Vercel project's tea
 APIs, and `docs/DOMAIN_EMAIL.md:29`, `docs/PLATFORM.md` risks 1 and 2, `docs/CAPABILITIES.md:370`
 from the repository. The admin@ mailbox stays `[D]` until Ravi Kiran confirms it in the
 Vianet panel. Sources: Supabase API, Vercel API, this repository.
+
+**Outcome, 2026-10-30.** The Vercel project is on the store's team `robinsons-store1` and the
+repository is `robinsons-store/robinsons-store` [V-run, Vercel get_project and GitHub
+list_branches, 2026-10-30]. One deviation from ruling 2: the repository is owned by admin@'s
+GitHub account rather than an organization, so it cannot have a second owner yet (A-05).
+Conditions 1 to 4 are open as A-01 to A-03, A-05 and A-06.

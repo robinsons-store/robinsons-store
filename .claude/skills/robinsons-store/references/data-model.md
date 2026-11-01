@@ -22,6 +22,7 @@
 - HR: employee, effective-dated pay_rate, and shift (the weekly schedule and hours). The /hr and /hr/schedule screens.
 - tax_rules keyed by province for portability. Ontario 13 percent HST is the working default.
 - activity_log: actor_id, action, entity, entity_id. Audit on every write.
+- department_field: store_id, department_id, form (vendor or invoice), field_key, asked, updated_by. One row per box changed on the /department-fields screen, unique per department, form and question. No rows means the code lists apply. Only the owner writes it; every store member, including managers, can read it; there is no delete [R supabase/auth_setup.sql:170-199].
 
 ## Deferred
 - pgvector RAG for ask-your-store at scale, ML-based reorder points, and SMS alerts. The current ask and reorder agents pass store data directly as context; see docs/STATUS.md.
@@ -32,4 +33,4 @@
 - Money: numeric in dollars. Integer cents is not planned.
 - Confidence: every extracted receiving_line carries a confidence value 0 to 1. Below 0.7 is flagged in the UI and must be confirmed by a human. Never auto-post low-confidence dollar amounts.
 - Row-level security: the dev policies in schema.sql allow the anon key for the demo, on every public table and on the documents storage bucket. auth_setup.sql replaces them with per-store, per-role policies and an authenticated-only storage policy when login is turned on. Field-level control so floor staff can be limited to quantities while lead, manager, and owner see costs. When you add a table to schema.sql, you must also add it to auth_setup.sql or it denies everyone under enforced auth.
-- Store original documents in the documents bucket. Move to signed URLs if invoices contain anything sensitive.
+- Store original documents in the documents bucket at a path from documentPath(storeId, kind, ...); they are read through signed URLs and fenced by store and kind (auth_setup.sql 3f, ADR-004).

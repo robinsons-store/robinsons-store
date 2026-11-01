@@ -9,23 +9,28 @@ that make a wrong department map safe to ship.
 
 ## Running it
 
+CI runs this through `run.sh`, in the "Module checks" step, so a red result blocks the
+merge. Run it from the repo root:
+
 ```sh
-npx tsc -p scripts/vendorfields-check/tsconfig.json
-# tsc leaves the "@/lib/..." aliases in the output; node cannot resolve them
-python3 - <<'PY'
-import re, glob, os
-d = "scripts/vendorfields-check/out"
-for f in glob.glob(os.path.join(d, "*.js")):
-    s = open(f).read()
-    open(f, "w").write(re.sub(r'require\("@/lib/([^"]+)"\)', r'require("./\1")', s))
-PY
-cp scripts/vendorfields-check/check.js scripts/vendorfields-check/out/
-node scripts/vendorfields-check/out/check.js
+bash scripts/vendorfields-check/run.sh
 ```
 
-Adjust `outDir` in the tsconfig if you want the output somewhere else. Nothing here is a
-project dependency and it is not wired into the commit gates: run it when you touch
-`vendorFields.ts`.
+`run.sh` compiles the module with this folder's tsconfig into `out/`, rewrites the
+`@/lib/...` requires that tsc leaves in the output to `./...` with sed, copies `check.js`
+into `out/` and runs it with node.
+
+The `run.sh` contract, for any new check: put a `run.sh` in a `scripts/<name>-check/` folder
+that runs from the repo root, needs no executable bit (CI calls it with `bash`), and exits
+non-zero when an assertion fails. CI picks up every `scripts/*-check/run.sh` in name order
+with no edit to `ci.yml`. Compiled output goes in the folder's `out/`, which the root
+`.gitignore` keeps out of git (`scripts/*-check/out/`).
+
+Run it when you touch `vendorFields.ts`, `fieldChoices.ts` or `departments.ts`. Since
+2026-10-25 it also proves the Department fields screen's rules: no rows means the code list,
+a tick or an untick beats it except on the locked questions (name, status) and the money
+gate, the add-every-question button still adds every one, and a section (Clothing, Gifts,
+Garden Center) is asked exactly what its department is.
 
 ## The three rules it proves
 

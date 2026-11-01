@@ -43,6 +43,7 @@ export function Icon({ name, size = 18 }: { name: NavIcon; size?: number }) {
     case "shield": return <svg {...p}><path d="M12 3l8 3v6c0 4.6-3.2 7.7-8 9-4.8-1.3-8-4.4-8-9V6z" /><path d="M9 12l2 2 4-4.5" /></svg>;
     case "import": return <svg {...p}><path d="M12 15V4" /><path d="M7.5 8.5L12 4l4.5 4.5" /><path d="M4 20h16" /></svg>;
     case "team": return <svg {...p}><circle cx="10" cy="8" r="3.4" /><path d="M4 20a6 6 0 0 1 12 0" /><path d="M19 8v6M16 11h6" /></svg>;
+    case "fields": return <svg {...p}><rect x="4" y="4" width="5" height="5" rx="1" /><path d="M5.6 6.6l1 1 1.6-1.8" /><rect x="4" y="15" width="5" height="5" rx="1" /><path d="M12 6.5h8M12 17.5h8" /></svg>;
     case "more": return <svg {...p}><path d="M5 12h.01M12 12h.01M19 12h.01" strokeWidth={3.2} /></svg>;
   }
 }

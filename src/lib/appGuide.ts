@@ -95,6 +95,7 @@ HOW COMMON THINGS ARE DONE:
   issue: ..." and it lands in Suggestions when signed in.
 
 WHO SEES WHAT: staff see no dollar figures anywhere; leads, managers, and the owner see
-money. Editing needs manager or owner. Deleting anything only hides it (soft void); the
+money. Editing needs manager or owner. Only the owner edits Department fields; managers can
+read the choices. Deleting anything only hides it (soft void); the
 history stays for taxes.
 `;

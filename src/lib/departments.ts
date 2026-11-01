@@ -73,6 +73,33 @@ export function byDepartmentOrder<T extends { name: string | null }>(a: T, b: T)
   return d !== 0 ? d : (a.name || "").localeCompare(b.name || "");
 }
 
+export type DepartmentNode = { id: string; name: string; parent_department_id: string | null };
+
+// The department whose questions a department's forms ask: itself, or for a section such as
+// Gifts, the department it sits under. The field registries and the Department fields
+// screen key on this, so a section is never asked something its department was not.
+//
+// Walks to the top rather than one step, and stops on a loop or on a parent that did not
+// load, answering with the highest department it could reach. Null only when the id itself
+// is not in the list, and callers fall back to the name they already have.
+export function fieldDepartment<T extends DepartmentNode>(
+  id: string | null | undefined,
+  departments: T[]
+): T | null {
+  if (!id) return null;
+  const byId = new Map(departments.map((d) => [d.id, d]));
+  let d = byId.get(id);
+  if (!d) return null;
+  const seen = new Set<string>([d.id]);
+  while (d.parent_department_id) {
+    const p = byId.get(d.parent_department_id);
+    if (!p || seen.has(p.id)) break;
+    seen.add(p.id);
+    d = p;
+  }
+  return d;
+}
+
 // Sort without mutating the caller's array (React state arrays are shared).
 export function sortDepartments<T extends { name: string | null }>(list: T[]): T[] {
   return [...list].sort(byDepartmentOrder);

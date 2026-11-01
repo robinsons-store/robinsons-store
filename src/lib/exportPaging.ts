@@ -15,7 +15,7 @@
 
 export const EXPORT_PAGE_SIZE = 1000; // Supabase answers at most 1000 rows per request
 
-type PageResult<Row> = { data: Row[] | null; error: { message: string } | null };
+type PageResult<Row> = { data: Row[] | null; error: { message: string; code?: string } | null };
 
 // The few query-builder calls keyset paging needs. A Supabase select satisfies it.
 export interface KeysetQuery<Row> extends PromiseLike<PageResult<Row>> {
@@ -37,7 +37,7 @@ export async function fetchAllByKey<Row extends Record<string, unknown>>(
     let q = query();
     if (after !== undefined) q = q.gt(key, after);
     const { data, error } = await q.order(key, { ascending: true }).limit(pageSize);
-    if (error) throw new Error(error.message);
+    if (error) throw Object.assign(new Error(error.message), { code: error.code });
     const rows = data || [];
     out.push(...rows);
     if (rows.length < pageSize) return out;
@@ -56,6 +56,6 @@ export async function readTable(db: any, table: string, filter: (q: any) => any)
   try {
     return await fetchAllByKey<any>(() => filter(db.from(table).select("*")), "id");
   } catch (err: any) {
-    throw new Error(`${table}: ${err?.message || err}`);
+    throw Object.assign(new Error(`${table}: ${err?.message || err}`), { code: err?.code });
   }
 }

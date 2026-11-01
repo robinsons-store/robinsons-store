@@ -123,14 +123,46 @@ Run in this order; skip nothing (each is safe to re-run):
    the two functions that reserve and finish each call. The cap and the log work as soon as
    this runs. Only the owner can read the rows once login is on; with enforced login, rerun
    `auth_setup.sql` after it to give the owner that read.
-10. `auth_setup.sql` — ONLY if enforced login is on. Always re-run it LAST after any script
+10. `money_by_role.sql`: staff never see a dollar figure, enforced by the database (ARCH-03,
+   docs/adr/ADR-003-money-by-role-at-the-database.md). With enforced login it closes the nine
+   tables that carry an amount to everyone but lead, manager and owner, and adds three views
+   with no dollar column that the staff screens read (vendor_directory, invoice_due,
+   insurance_renewal). On a demo database it only adds the views. It is the same block as
+   `auth_setup.sql` section 3e, so either order ends the same. `money_by_role_test.sql` is
+   its proof, for a disposable database only; it is never in the run order.
+11. `documents_by_role.sql`: stored files fenced by store and role (ARCH-04,
+   docs/adr/ADR-004-stored-files-by-store-and-role.md). With enforced login, a member opens
+   only their own store's files: invoice photos only as lead, manager or owner, screenshots
+   and voice notes also when they attached them, the workbook archive only as owner or
+   manager. Files saved before the store folders are recorded once with their store, so none
+   moves; it prints how many. On a demo database it changes nothing. It must run after
+   `money_by_role.sql`, and it is the same block as `auth_setup.sql` sections 3d and 3f.
+   `documents_by_role_test.sql` is its proof, for a disposable database with Supabase's
+   storage schema only; it is never in the run order.
+12. `feedback_summary.sql`: the AI's description of a suggestion screenshot gets its own table,
+   `feedback_summary` (docs/adr/ADR-005-screenshot-descriptions-follow-the-screenshot.md).
+   Descriptions already on `feedback.ai_summary` move into it, then that column is dropped.
+   With enforced login a description opens to the members who may open the file it was read
+   from (lead, manager and owner, and the member who attached the screenshot), and the
+   database dates every save; on a demo database the table is open like the others. It must run
+   after `documents_by_role.sql`, and it is the same block as `auth_setup.sql` section 3g.
+   `feedback_summary_test.sql` is its proof, for a disposable database with Supabase's storage
+   schema only; it is never in the run order.
+13. `department_field.sql`: the table behind the Department fields screen. One row per box
+   somebody changed: this department, this form (vendor or invoice), this question, asked or
+   not. An empty table means every form asks its usual questions, so running it changes no
+   screen. With enforced login it applies its own policies (every member reads, only the owner
+   writes, nobody deletes), so the screen works without rerunning
+   `auth_setup.sql`.
+14. `auth_setup.sql`: ONLY if enforced login is on. Always re-run it LAST after any script
    above, because it (re)applies the per-store policies to every table including new ones.
 
 ## What each remaining file is
 
 - `auth_setup.sql` — the enforced-auth policy set (per-store, per-role; app_auth helpers).
-- `storage.sql` (if present) / bucket setup — the documents bucket used by Capture and by
-  Suggestions attachments (paths under feedback/).
+- The `documents` bucket: made by `schema.sql` (open, for the demo) and locked by
+  `auth_setup.sql` sections 3d and 3f. Files sit under `<store_id>/invoices/`,
+  `<store_id>/feedback/` and `<store_id>/imports/`; older ones keep their earlier names.
 
 ## After running scripts
 

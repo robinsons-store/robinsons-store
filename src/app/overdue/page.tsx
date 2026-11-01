@@ -52,13 +52,43 @@ export default function Overdue() {
       setError(error.message);
       return;
     }
-    const list = (data as unknown as Invoice[]) || [];
+    let list = (data as unknown as Invoice[]) || [];
+    // Once login is on, a role that cannot see money gets no invoice rows at all
+    // (supabase/money_by_role.sql). It reads the same open invoices, with no amounts, from the
+    // invoice_due view, and vendor names from vendor_directory. A money role gets the same rows
+    // from either, so an empty table means nothing is outstanding and the view says the same.
+    if (list.length === 0) list = await dueWithoutAmounts();
     setInvoices(list);
     try {
       setSettlements(await fetchSettlements(list.map((i) => i.id)));
     } catch {
       setSettlements(new Map());
     }
+  }
+
+  async function dueWithoutAmounts(): Promise<Invoice[]> {
+    let dq = supabase
+      .from("invoice_due")
+      .select("id, vendor_id, invoice_number, terms, due_date, status")
+      .is("voided_at", null)
+      .in("status", ["unpaid", "partially_paid", "postdated"])
+      .order("due_date", { ascending: true });
+    let vq = supabase.from("vendor_directory").select("id, name");
+    if (storeId) {
+      dq = dq.eq("store_id", storeId);
+      vq = vq.eq("store_id", storeId);
+    }
+    const [due, vendors] = await Promise.all([dq, vq]);
+    if (due.error || vendors.error) return [];
+    const names = new Map(((vendors.data as { id: string; name: string }[]) || []).map((v) => [v.id, v.name]));
+    return ((due.data as any[]) || []).map((r) => ({
+      ...r,
+      amount: null,
+      hst_amount: null,
+      freight_charges: null,
+      tax_mode: null,
+      vendor: r.vendor_id ? { name: names.get(r.vendor_id) || "" } : null
+    })) as unknown as Invoice[];
   }
 
   useEffect(() => {
@@ -197,8 +227,9 @@ export default function Overdue() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                 <div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    {/* The name opens the vendor's full ledger, so an overdue row is never a dead end. */}
-                    {i.vendor_id ? (
+                    {/* The name opens the vendor's full ledger, so an overdue row is never a dead end.
+                        The ledger is money, so a role that cannot see money gets the name alone. */}
+                    {i.vendor_id && showMoney ? (
                       <Link href={`/vendors/${i.vendor_id}`} style={{ fontWeight: 700, textDecoration: "none" }}>{i.vendor?.name || "Vendor"}</Link>
                     ) : (
                       <strong>{i.vendor?.name || "Vendor"}</strong>

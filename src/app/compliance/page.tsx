@@ -41,7 +41,17 @@ export default function Compliance() {
     let pq = supabase.from("insurance_policy").select("id, store_id, name, provider, policy_number, coverage, premium, renewal_date, notes").is("voided_at", null).order("renewal_date", { ascending: true, nullsFirst: false });
     if (storeId) pq = pq.eq("store_id", storeId);
     const p = await pq;
-    setPolicies((p.data as unknown as InsurancePolicy[]) || []);
+    let list = (p.data as unknown as InsurancePolicy[]) || [];
+    // Once login is on, a role that cannot see money gets no policy rows (the premium is on the
+    // row; supabase/money_by_role.sql). It reads names and renewal dates from the
+    // insurance_renewal view instead. A money role gets the same policies from either.
+    if (!p.error && list.length === 0) {
+      let rq = supabase.from("insurance_renewal").select("id, store_id, name, renewal_date").is("voided_at", null).order("renewal_date", { ascending: true, nullsFirst: false });
+      if (storeId) rq = rq.eq("store_id", storeId);
+      const r = await rq;
+      if (!r.error) list = (r.data as unknown as InsurancePolicy[]) || [];
+    }
+    setPolicies(list);
   }
 
   useEffect(() => {

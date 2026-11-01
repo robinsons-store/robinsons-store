@@ -64,9 +64,9 @@ When working on TypeScript or React files in this project, follow these conventi
 
 ## Document Handling
 
-- Upload to the `documents` bucket via `supabase.storage`
+- Upload to the `documents` bucket via `supabase.storage`, at a path from `documentPath(storeId, kind, ...)` in `src/lib/documentPath.ts`; other paths are refused under enforced login
 - Store the path on `source_file_path` or `confirmation_file_path`
-- Read thumbnails through `docUrls()` from `src/lib/docs.ts` (signed URLs with public fallback)
+- Read thumbnails through `docUrls()` from `src/lib/docs.ts` (signed URLs; no URL for a file the member may not open)
 - Never use `getPublicUrl` directly as the primary read path
 
 ## Component Patterns

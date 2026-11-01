@@ -1,7 +1,7 @@
 # Requirements ledger
 
 The living requirements record for the Robinson's General Store platform. Every ask from the
-owner (Ravi Kiran) and the developer (Raviteja, who builds this with AI assistance) lands
+owner and the developer lands
 here with its source, its state, and where it lives in the code, so context survives any
 chat, machine, or person. Update this file in
 the same pull request as the work; if it is not recorded here, it is not agreed.
@@ -17,8 +17,41 @@ Robinson's General Store, Dorset, Ontario (lakeside; hardware, grocery, dry good
 clothing, bakery, meat, produce, chip stand, garden centre). The owner is non-technical and
 phone-first; feedback historically arrived as WhatsApp texts in Telugu-English, screenshots,
 voice notes, and annotated Excel workbooks. Roles: owner, manager, lead, staff. Staff and
-leads never see dollar figures (leads do: see canSeeMoney; staff never). One store today,
-multi-store built in.
+leads never see dollar figures (leads do: see canSeeMoney; staff never). One store today.
+
+## Product direction
+
+Direction, recorded 2026-10-30: Robinsons is the first store of a product intended for other
+independent stores. This section is the canonical home for that direction and its delivery state.
+
+- Every change must work for another store. Store-specific facts (name, address, branding,
+  departments and their order, vendor and invoice questions, tax region, licences) belong
+  in per-store data or settings. Do not add another fixed store fact in code.
+- A request from one store becomes a setting all stores can use, or waits. No per-store
+  forks or branches. Move the configuration gaps below into store data when touched.
+- The intended product uses one shared deployment and database. Larger infrastructure is
+  earned by actual store count, as described in the skill's locked architecture.
+
+**PARTIAL: current multi-store support.** Data and member access are scoped per store
+[R src/lib/store.ts:28] [R src/lib/auth.ts:158] [R supabase/auth_setup.sql:125]; the configuration gaps below remain.
+Other readiness items are tracked privately.
+
+**TARGET: onboard a second store without a code change.** Onboarding should need only a
+store row, its settings and its members. Record any required code change here as a gap.
+
+Configuration gaps to address when touched:
+
+- Store identity in the Ask prompt [R src/app/api/ask/route.ts:62,145], app guide
+  [R src/lib/appGuide.ts:6], page title [R src/app/layout.tsx:11], login plaque
+  [R src/app/login/page.tsx:43] and AppShell branding and fallback
+  [R src/components/AppShell.tsx:113,118].
+- Store identity in the reorder prompt [R src/app/api/reorder/route.ts:54,84].
+- Alert email branding in the message and subject [R src/app/api/alerts/route.ts:115,120].
+- Capture's tax lookup fixed to region "Ontario" [R src/app/capture/page.tsx:68], with
+  HST_RATE as fallback [R src/lib/format.ts:16]; the store needs a tax region setting.
+- Department sequence fixed in code [R src/lib/departments.ts:11].
+
+## Store background
 
 What the world knows about the store (researched 2026-07-27; sources: Discover Muskoka,
 1000 Towns of Canada, Tripadvisor, Yelp, BayToday, dorsetcanada.com):
@@ -41,7 +74,8 @@ What the world knows about the store (researched 2026-07-27; sources: Discover M
 ## Standing invariants (never regress these)
 
 1. Every read and write is store-scoped; new tables get store_id, RLS, and a line in
-   auth_setup.sql section 3a.
+   auth_setup.sql section 3a (section 3e and supabase/money_by_role.sql if the table holds a
+   dollar figure).
 2. Money visibility fails closed: null/unknown role sees no dollars (canSeeMoney).
 3. Editing is role-gated (canEdit); destructive actions are soft voids (voidRow /
    void_payment) filtered with .is("voided_at", null); user-facing label is Void.
@@ -134,6 +168,17 @@ SHIPPED (see VERIFICATION.md for sign-off):
   that future field assignments become one-line data edits, is exactly right and is the
   point.
 
+- Select fields per department in the vendor, payment and invoice profiles (relayed
+  2026-10-25: "We need ability to select fields in vendor profile, payment profile and invoice
+  profile on department level", reported as not done). PARTIAL 2026-10-25: the Department
+  fields screen (Admin) lets the owner tick, per department, which vendor and
+  invoice questions the forms ask, stored in the department_field table; no rows means the
+  code lists above apply. Managers can read the choices [R supabase/auth_setup.sql:170-199].
+  Sections follow the department they sit under on every form. Locked
+  whatever the screen says: vendor name and status; invoice number, date, amount, tax,
+  freight, filing, due date and status. OPEN: which payment questions should vary by
+  department [Q: the requester]; the payment forms are unchanged until that is answered.
+
 QUEUED (agreed, not built):
 - Department photo tiles and knowledge-note photo attachments, sourced from the owner's
   walkthrough (one photo per department from his phone; website photos ruled out).
@@ -158,20 +203,19 @@ QUEUED (agreed, not built):
 - Price-check activity list and notification (grocery).
 
 OPEN (waiting on the owner):
-- Move every account to the store (asked 2026-10-18, "prepare for ownership transfer and
-  account set up"). The store already owns its domain; hosting, database, code, AI key and
-  the Slack app still sit on accounts the developer opened. docs/HANDOVER.md is the register
-  and the runbook: a store admin mailbox first, then Supabase to the store and onto Pro
-  (closes PLATFORM.md risk 2; the organization was confirmed on Free 2026-10-18), Vercel to a
-  store team on Pro (closes risk 1), the repository to a store GitHub organization, every key
-  reissued under the store, and the dev environment built straight onto the store's
-  accounts so it never needs moving. About $60 to $95 a month afterwards. Needs the owner
-  for every sign-up and card; the developer does the transfers.
+- DONE 2026-10-25: move every account to the store (asked 2026-10-18). Hosting is on the
+  store's Vercel team and the code at robinsons-store/robinsons-store. Still open, in
+  docs/HANDOVER.md: Supabase and Vercel on Pro (A-01, closes PLATFORM.md risks 1 and 2), the
+  original keys reissued (A-02), and a second owner on GitHub (A-05).
+- Dev environment (asked 2026-07-31). PARTIAL 2026-10-30: the dev database
+  robinsons-store-dev is loaded with the repository seed data, every preview reads it, and develop
+  deploys to its own address. Open, needs admin@: the SUPABASE_DB_URL_DEV secret and the
+  DEV_URL variable (docs/ENVIRONMENTS.md steps 2 and 5), and a way for Ravi to open the dev
+  site (step 6).
 - Confirm the domain renewed. robinsonsgeneralstore.ca was due on 2026-10-16 with auto-renew
-  confirmed on, but the renewal itself has not been seen, and the watchdog may be checking
-  the vercel.app address, which would not notice a lapse. Check the Vianet panel, record the
-  new expiry in docs/DOMAIN_EMAIL.md, and set the GitHub variable PRODUCTION_URL to
-  https://app.robinsonsgeneralstore.ca.
+  confirmed on, but the renewal itself has not been seen. Check the Vianet panel and record
+  the new expiry in docs/DOMAIN_EMAIL.md. The watchdog checks the custom domain since
+  2026-10-25, so a lapse now fails a check.
 - DONE, verified 2026-08-11: run supabase/vendor_ordering_fields.sql. This was recorded as
   failing since 2026-08-06, with the vendor ordering fields unable to save. The live health
   check now answers ok:true with "vendor columns present" passing, so the script has been
@@ -290,3 +334,12 @@ OPEN (waiting on the owner):
 4. The app's Suggestions page is the preferred channel now: notes, screenshots (auto-read
    into text), and voice recordings stay attached, and "Copy developer digest" produces the
    exact block to paste into a build chat.
+
+## How this maps to the rest of the docs
+
+CLAUDE.md and the robinsons-store skill point here for product direction. STATUS.md and
+VERIFICATION.md record the change; the skill keeps the locked architecture and invariants.
+
+**Basis (product direction): 6 claims checked this session (2026-10-30), 6 confirmed,
+0 killed, 13 sources.** The PARTIAL state and five configuration bullets were checked
+against the source files cited in that section. The onboarding TARGET records direction.

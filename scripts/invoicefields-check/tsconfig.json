@@ -10,5 +10,5 @@
     "paths": { "@/*": ["src/*"] },
     "lib": ["es2020"]
   },
-  "include": ["../../src/lib/invoiceFields.ts"]
+  "include": ["../../src/lib/invoiceFields.ts", "../../src/lib/fieldChoices.ts", "../../src/lib/departments.ts"]
 }

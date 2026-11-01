@@ -6,6 +6,7 @@ import { parseSchedule, looksLikeSchedule } from "@/lib/importSchedule";
 import { planScheduleLoad, scheduleLoadMessage } from "@/lib/scheduleLoad";
 import { parseInventory } from "@/lib/importInventory";
 import { REQUIRE_AUTH_SERVER } from "@/lib/serverMember";
+import { documentPath } from "@/lib/documentPath";
 
 export const runtime = "nodejs";
 // Run in Montreal, not the default iad1 (Washington DC). The Supabase project is in
@@ -14,15 +15,15 @@ export const runtime = "nodejs";
 // to the database, which Vercel recommends for latency.
 export const preferredRegion = "yul1";
 
-// Every recognized upload is archived in the documents bucket under imports/, so the app
-// itself holds the version history of the owner's workbooks (drop a new version any time;
-// the archive keeps the old ones downloadable). Best-effort: an archive failure never
-// blocks the import itself.
-async function archiveUpload(sb: any, buf: Buffer, fileName: string): Promise<void> {
+// Every recognized upload is archived in the documents bucket under the store's imports/
+// folder, so the app itself holds the version history of the owner's workbooks (drop a new
+// version any time; the archive keeps the old ones downloadable by owner and manager).
+// Best-effort: an archive failure never blocks the import itself.
+async function archiveUpload(sb: any, buf: Buffer, fileName: string, storeId: string): Promise<void> {
   try {
     const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
     const safe = fileName.replace(/[^\w.\-]+/g, "_");
-    await sb.storage.from("documents").upload(`imports/${stamp}_${safe}`, buf, {
+    await sb.storage.from("documents").upload(documentPath(storeId, "imports", `${stamp}_${safe}`), buf, {
       contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       upsert: false
     });
@@ -433,14 +434,14 @@ export async function POST(req: Request) {
     const uploadName = (file as any).name ? String((file as any).name) : "workbook.xlsx";
 
     if (looksLikeSchedule(sheets)) {
-      await archiveUpload(sb, buf, uploadName);
+      await archiveUpload(sb, buf, uploadName, storeId);
       return await importScheduleFlow(sb, sheets, storeId, actorId);
     }
 
     // The evolved ledger layout (named headers like Vendor Company / PaymentMethod) gets
     // the header-driven parser; the original fixed-position layout still goes through v1.
     if (looksLikeBookingsV2(sheets)) {
-      await archiveUpload(sb, buf, uploadName);
+      await archiveUpload(sb, buf, uploadName, storeId);
       return await importBookingsV2Flow(sb, sheets, storeId, actorId);
     }
 
@@ -449,7 +450,7 @@ export async function POST(req: Request) {
       const inv = parseInventory(sheets);
       if (inv.lines.length) {
         const departmentId = form.get("department_id") ? String(form.get("department_id")) : null;
-        await archiveUpload(sb, buf, uploadName);
+        await archiveUpload(sb, buf, uploadName, storeId);
         return await importInventoryFlow(sb, sheets, uploadName, storeId, actorId, departmentId);
       }
       return Response.json({
@@ -463,7 +464,7 @@ export async function POST(req: Request) {
     if (exErr) {
       return Response.json({ ok: false, message: `Could not read existing vendors: ${exErr.message}` }, { status: 200 });
     }
-    await archiveUpload(sb, buf, uploadName);
+    await archiveUpload(sb, buf, uploadName, storeId);
     const present = new Set(((existing as any[]) || []).map((v) => String(v.name || "").toLowerCase()));
 
     const newVendors = parsed.vendors.filter((v) => !present.has(v.name.toLowerCase()));

@@ -7,6 +7,7 @@ import { useActiveStore } from "@/lib/store";
 import { REQUIRE_AUTH, authHeader, useMember } from "@/lib/auth";
 import { formatCAD } from "@/lib/format";
 import { docUrls } from "@/lib/docs";
+import { documentPath } from "@/lib/documentPath";
 import type { Department } from "@/lib/types";
 
 // The shape the import API returns. The route auto-detects the bookings ledger, the weekly
@@ -48,15 +49,22 @@ export default function Import() {
   // owner's workbook versions live inside the app and stay downloadable.
   const [archive, setArchive] = useState<Array<{ name: string; url: string | null }>>([]);
 
+  // The store's own imports/ folder, plus the shared imports/ folder that older workbooks were
+  // archived in; the storage rules show each member only their own store's workbooks.
   async function loadArchive() {
+    if (!storeId) return;
     try {
-      const { data } = await supabase.storage.from(DOCUMENTS_BUCKET).list("imports", {
-        limit: 12,
-        sortBy: { column: "name", order: "desc" }
-      });
-      const files = (data || []).filter((f) => f.name && !f.name.startsWith("."));
-      const urls = await docUrls(files.map((f) => `imports/${f.name}`));
-      setArchive(files.map((f) => ({ name: f.name, url: urls.get(`imports/${f.name}`) || null })));
+      const folders = [documentPath(storeId, "imports"), "imports"];
+      const listed = await Promise.all(folders.map((folder) =>
+        supabase.storage.from(DOCUMENTS_BUCKET).list(folder, { limit: 12, sortBy: { column: "name", order: "desc" } })
+      ));
+      const files = listed
+        .flatMap(({ data }, i) => (data || []).map((f) => ({ name: f.name, path: `${folders[i]}/${f.name}` })))
+        .filter((f) => f.name && !f.name.startsWith("."))
+        .sort((a, b) => b.name.localeCompare(a.name))
+        .slice(0, 12);
+      const urls = await docUrls(files.map((f) => f.path));
+      setArchive(files.map((f) => ({ name: f.name, url: urls.get(f.path) || null })));
     } catch {
       setArchive([]);
     }

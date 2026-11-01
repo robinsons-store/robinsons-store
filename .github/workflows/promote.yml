@@ -2,20 +2,15 @@ name: Promote develop to production
 
 # The gate between the dev site and the store's live one.
 #
-# Ravi tries a change on the dev site against dummy data. When it is right, somebody runs this
+# The store owner tries a change on the dev site against dummy data. When it is right, somebody runs this
 # workflow, and that run promotes the change to production.
 #
-# It used to watch the Jira board and promote whatever had been moved to Approved. The board
-# is gone (2026-08-12), so the approval is now the act of starting this workflow: Actions,
-# Promote develop to production, Run workflow. That is a worse place for approval to live than
-# next to the request it approves, and it is worth saying so plainly rather than pretending
-# the swap was free. What did not change is the part that matters: a person still says yes,
-# and no schedule can say it for them. The old cron is gone with the board, because a
-# scheduled run with nothing to read would only have burned minutes.
+# A person approves promotion by starting Actions, Promote develop to production,
+# Run workflow. There is no scheduled promotion.
 #
 # WHAT THIS DOES NOT DO: it does not decide whether a change is safe. That is still the tier
-# classifier reading the diff, and the same three gates running on the pull request. This
-# only answers "has a person said yes", which is the one question a machine must never
+# classifier reading the diff, and CI passing on the exact commit it merges (the last step).
+# This only answers "has a person said yes", which is the one question a machine must never
 # answer for itself.
 #
 # Inert until a develop branch exists, so it is safe to merge before the dev site is set up.
@@ -28,13 +23,14 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: write        # merge
+  pull-requests: write   # open, read and merge the promotion pull request
+  actions: write         # start CI on develop and read its result; start CI and scripts on main
 
 jobs:
   promote:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -103,12 +99,89 @@ jobs:
           number=$(gh pr list --head develop --base main --state open --json number --jq '.[0].number')
           echo "number=$number" >> "$GITHUB_OUTPUT"
 
-      - name: Merge it once its checks pass
+      # The promotion merges only like this, the same way the Slack loop's tier A step does
+      # (ADR-002, decision 3):
+      #   1. develop must already contain everything on main. The merge commit then holds
+      #      exactly develop's files, so the commit CI checks is the code that lands. If main
+      #      has something develop lacks, a person brings develop level first
+      #      (docs/ENVIRONMENTS.md, "Keep develop level with main").
+      #   2. CI is started on the pull request's head commit and waited for here. The pull
+      #      request was opened with GITHUB_TOKEN, and GitHub starts no workflow for an event
+      #      made with that token except workflow_dispatch (ADR-002, context item 3).
+      #   3. Immediately before merging, the pull request is read again (still open, still
+      #      develop into main, still on the commit CI checked) and main is fetched again. The
+      #      merge is pinned to that commit (--match-head-commit), so a push to develop after
+      #      the read makes GitHub refuse the merge rather than land something unchecked.
+      #   4. Anything unexpected (CI never starts, fails, times out, the pull request or main
+      #      moved, GitHub refuses) leaves the pull request open for a person and fails this
+      #      run, so whoever started it can see that production did not change.
+      # Merge immediately after CI passes on the recorded head and main is unchanged.
+      - name: Merge it once CI passes on its exact commit
         if: steps.pr.outputs.number != ''
+        timeout-minutes: 25
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ steps.pr.outputs.number }}
         run: |
-          # --auto holds the merge until every check is green, so a red check means this never
-          # lands rather than landing first and being noticed afterwards.
-          gh pr merge "${{ steps.pr.outputs.number }}" --merge --auto
-          echo "Pull request #${{ steps.pr.outputs.number }} will merge when its checks pass."
+          hold() {
+            echo "::error::$1 Pull request #$PR is left open for a person; production has not changed."
+            exit 1
+          }
+          read_pr() {
+            gh pr view "$PR" --repo "$GITHUB_REPOSITORY" \
+              --json state,baseRefName,headRefName,isCrossRepository,headRefOid \
+              --jq '"\(.state) \(.baseRefName) \(.headRefName) \(.isCrossRepository) \(.headRefOid)"'
+          }
+
+          now=$(read_pr) || hold "Could not read the pull request."
+          read -r state base head cross SHA <<< "$now"
+          [ "$state $base $head $cross" = "OPEN main develop false" ] \
+            || hold "The pull request is not this repository's develop into main (now: $now)."
+          git fetch --no-tags --quiet origin "+refs/heads/main:refs/remotes/origin/main" \
+            "+refs/pull/$PR/head:refs/remotes/pr/$PR" || hold "Could not fetch main and the pull request."
+          [ "$(git rev-parse "refs/remotes/pr/$PR")" = "$SHA" ] || hold "The pull request moved while it was read."
+          git merge-base --is-ancestor origin/main "$SHA" \
+            || hold "develop does not contain everything on main, so CI on develop would not check what lands. Merge a main to develop pull request first, then run this again."
+          before=$(git rev-parse origin/main) || hold "Could not read main."
+
+          started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref develop || hold "Could not start CI on develop."
+          run=""
+          for _ in $(seq 1 24); do
+            sleep 5
+            run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch develop \
+                    --event workflow_dispatch --json databaseId,headSha,createdAt \
+                    --jq "[.[] | select(.headSha == \"$SHA\" and .createdAt >= \"$started\")][0].databaseId // empty") || run=""
+            [ -n "$run" ] && break
+          done
+          [ -n "$run" ] || hold "CI never started on $SHA."
+          gh run watch "$run" --repo "$GITHUB_REPOSITORY" --exit-status --interval 20 > /dev/null \
+            || hold "CI did not pass on $SHA: ${{ github.server_url }}/${{ github.repository }}/actions/runs/$run"
+
+          again=$(read_pr) || hold "Could not read the pull request again."
+          [ "$again" = "OPEN main develop false $SHA" ] || hold "The pull request is no longer what CI checked (now: $again)."
+          git fetch --no-tags --quiet origin "+refs/heads/main:refs/remotes/origin/main" || hold "Could not fetch main again."
+          [ "$(git rev-parse origin/main)" = "$before" ] || hold "main moved while CI ran. Bring develop level with main and run promotion again."
+          # Never --delete-branch: the head is develop.
+          gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --merge --match-head-commit "$SHA" \
+            || hold "GitHub refused the merge (branch protection or a newer commit)."
+          echo "Pull request #$PR merged at $SHA after CI passed on that commit (run $run)."
+
+          # The merge was made with GITHUB_TOKEN too, so the push to main may start no workflow.
+          # Ask for the two a push to main would have started. If GitHub does start them as
+          # well, each runs twice, which is safe: CI only reads, and every database script is
+          # safe to run again (migrate.yml).
+          # CI on main is what the post-deploy watch follows; without it the watch waits for its
+          # two-hour schedule. Vercel deploys from Git either way.
+          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref main \
+            || echo "::warning::Could not start CI on main; the post-deploy watch checks on its two-hour schedule."
+          # The database scripts, only when the promotion touches what migrate.yml's push
+          # trigger watches: supabase/** or migrate.yml itself. The list is read whole first, so
+          # grep stopping early cannot fail the pipe and skip the scripts.
+          changed=$(git diff --name-only "$before" "$SHA") \
+            || { echo "::error::Could not list what the promotion changed. If it touched supabase/, run Actions, Apply database scripts, on main now."; exit 1; }
+          if grep -qE '^(supabase/|\.github/workflows/migrate\.yml$)' <<< "$changed"; then
+            gh workflow run migrate.yml --repo "$GITHUB_REPOSITORY" --ref main -f dry_run=false \
+              || { echo "::error::The promotion changed database scripts, but Apply database scripts could not be started. Run it on main now: Actions, Apply database scripts, Run workflow."; exit 1; }
+            echo "Database scripts changed, so Apply database scripts was started on main."
+          fi

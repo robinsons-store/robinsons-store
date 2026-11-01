@@ -6,6 +6,7 @@ import { supabase, DOCUMENTS_BUCKET } from "@/lib/supabaseClient";
 import { formatCAD, round2 } from "@/lib/format";
 import { sortDepartments } from "@/lib/departments";
 import { useActiveStore } from "@/lib/store";
+import { documentPath } from "@/lib/documentPath";
 import { REQUIRE_AUTH, authHeader, canSeeMoney, useEffectiveActor } from "@/lib/auth";
 import type { AppUser, Department, Draft, LineItem } from "@/lib/types";
 import { prepareForExtraction, readableSize } from "@/lib/imagePrep";
@@ -59,9 +60,18 @@ export default function Capture() {
       if (storeId) dq = dq.eq("store_id", storeId);
       const { data: depts } = await dq;
       const { data: us } = await supabase.from("app_user").select("id, full_name, role").order("full_name");
-      let vq = supabase.from("vendor").select("id, name, department_id, default_terms").is("voided_at", null);
-      if (storeId) vq = vq.eq("store_id", storeId);
-      const { data: vs } = await vq;
+      // Staff capture too, and once login is on the vendor table returns them no rows
+      // (supabase/money_by_role.sql), so the match list comes from the money-free view for
+      // every role. Order amounts stay on purchase_order, which only a money role can read:
+      // the discrepancy check below only runs for those roles anyway. A database that has
+      // not run money_by_role.sql yet has no view; the vendor table answers then, so a deploy
+      // that lands before its migration does not lose the vendor match or the order check.
+      const vendorList = (from: "vendor_directory" | "vendor") => {
+        const q = supabase.from(from).select("id, name, department_id, default_terms").is("voided_at", null);
+        return storeId ? q.eq("store_id", storeId) : q;
+      };
+      let { data: vs, error: ve } = await vendorList("vendor_directory");
+      if (ve) ({ data: vs } = await vendorList("vendor"));
       let pq = supabase.from("purchase_order").select("vendor_id, order_amount").is("voided_at", null);
       if (storeId) pq = pq.eq("store_id", storeId);
       const { data: po } = await pq;
@@ -190,16 +200,17 @@ export default function Capture() {
   const hasLowFlags = lowLines > 0;
 
   async function save() {
-    if (!draft || (!file && !manual) || !deptId || !effectiveActorId) return;
+    if (!draft || (!file && !manual) || !deptId || !effectiveActorId || !storeId) return;
     if (hasDiscrepancy && !ack) return;
     if (hasLowFlags && !lowAck) return;
     setSaving(true);
     setError(null);
     try {
       // Photo capture uploads the document; a manual phone-order entry has no file to store.
+      // Staff may save the photo but not open it again: it shows prices (supabase/auth_setup.sql 3f).
       let path: string | null = null;
       if (file) {
-        path = `${deptId}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+        path = documentPath(storeId, "invoices", deptId, `${Date.now()}_${file.name.replace(/\s+/g, "_")}`);
         const up = await supabase.storage.from(DOCUMENTS_BUCKET).upload(path, file, { upsert: false });
         if (up.error) throw new Error(`storage: ${up.error.message}`);
       }
@@ -429,7 +440,7 @@ export default function Capture() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <button className="btn-primary" style={{ flex: "1 1 200px", minWidth: 160, maxWidth: 360 }} onClick={save} disabled={saving || (hasDiscrepancy && !ack) || (hasLowFlags && !lowAck)}>
+            <button className="btn-primary" style={{ flex: "1 1 200px", minWidth: 160, maxWidth: 360 }} onClick={save} disabled={saving || !storeId || (hasDiscrepancy && !ack) || (hasLowFlags && !lowAck)}>
               {saving ? "Saving." : "Save to feed"}
             </button>
             {hasDiscrepancy && !ack && (

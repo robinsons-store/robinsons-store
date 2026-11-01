@@ -46,14 +46,23 @@ export async function POST(req: NextRequest) {
     // The ordering profile is fetched here too. Without it this route answered "not on file"
     // for a summer order timeline that IS on file, because the columns were simply never
     // selected. minimum_order_amount is a dollar figure and rides the same money gate as the
-    // invoice section below.
-    const scopeVendor = db.from("vendor").select(vendorSelect(["department:department_id(name)"])).is("voided_at", null);
+    // invoice section below: a role that cannot see money reads the vendor_directory view,
+    // because once login is on the vendor table returns it no rows (supabase/money_by_role.sql).
+    // The view holds every vendor column but the money ones, so it is read whole: a field added
+    // to the registry before the view drops out of the answer instead of failing the read. The
+    // view cannot embed the department, so that role gets the names from the department list.
+    const scopeVendor = includeMoney
+      ? db.from("vendor").select(vendorSelect(["department:department_id(name)"])).is("voided_at", null)
+      : db.from("vendor_directory").select("*").is("voided_at", null);
+    const scopeDepartment = db.from("department").select("id, name");
     const scopeInvoice = db.from("invoice").select("amount, hst_amount, freight_charges, tax_mode, due_date, status, terms, vendor:vendor_id(name)").is("voided_at", null);
-    const [notes, vendors, invoices] = await Promise.all([
+    const [notes, vendors, invoices, departments] = await Promise.all([
       storeId ? scopeNote.eq("store_id", storeId) : scopeNote,
       storeId ? scopeVendor.eq("store_id", storeId) : scopeVendor,
-      includeMoney ? (storeId ? scopeInvoice.eq("store_id", storeId) : scopeInvoice) : Promise.resolve({ data: [] as any[] })
+      includeMoney ? (storeId ? scopeInvoice.eq("store_id", storeId) : scopeInvoice) : Promise.resolve({ data: [] as any[] }),
+      includeMoney ? Promise.resolve({ data: [] as any[] }) : (storeId ? scopeDepartment.eq("store_id", storeId) : scopeDepartment)
     ]);
+    const departmentName = new Map(((departments.data as any[]) || []).map((d) => [d.id, d.name]));
 
     const today = new Date().toISOString().slice(0, 10);
     const lines: string[] = [];
@@ -82,7 +91,7 @@ export async function POST(req: NextRequest) {
         ordering.push(`reorder: ${v.reorder_status === "reordered" ? "reordered this year" : "no reorder"}${v.reorder_comments ? " (" + v.reorder_comments + ")" : ""}`);
       }
       vendorNames.push(v.name);
-      lines.push(`- ${v.name} [${v.department?.name || ""}], terms ${v.default_terms || "n/a"}, status ${v.status}${v.phone ? ", phone " + v.phone : ""}${v.notes ? ", note: " + v.notes : ""}${ordering.length ? ", " + ordering.join(", ") : ""}`);
+      lines.push(`- ${v.name} [${v.department?.name || departmentName.get(v.department_id) || ""}], terms ${v.default_terms || "n/a"}, status ${v.status}${v.phone ? ", phone " + v.phone : ""}${v.notes ? ", note: " + v.notes : ""}${ordering.length ? ", " + ordering.join(", ") : ""}`);
     }
 
     if (includeMoney) {

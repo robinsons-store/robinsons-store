@@ -25,7 +25,7 @@ This is the Robinsons General Store operations platform, a capture-first receivi
 3. Actor integrity: created_by and activity_log.actor_id come from useEffectiveActor(); the actor dropdown is hidden when REQUIRE_AUTH is on
 4. Audit: every meaningful write inserts an activity_log row with a non-null entity_id
 5. Human in the loop on dollars: extracted lines carry confidence; low-confidence dollar fields never auto-post; discrepancy needs explicit acknowledgement
-6. New table, two places: a new table in schema.sql must also be added to auth_setup.sql or production breaks silently
+6. New table, two places: a new table in schema.sql must also be added to auth_setup.sql or production breaks silently; a table with a dollar figure goes in its section 3e and supabase/money_by_role.sql, never section 3a
 7. Build-safe: code must build with blank env. Auth and data helpers degrade to null, never throw
 
 ## Writing Rules

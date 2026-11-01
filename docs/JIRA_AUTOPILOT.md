@@ -51,7 +51,7 @@ that decision, because the script never reads either.
 
 | Tier | What it is | What happens |
 |---|---|---|
-| A | Words only: `docs/`, root `.md`, the in-app guide, under 300 lines | Merges itself once checks pass, and deploys |
+| A | Words only: `.md` and `.txt` under `docs/`, root `.md`, 300 lines or fewer (ADR-002) | Merges itself once checks pass, and deploys |
 | B | Anything else in the app | Draft pull request, a person merges. The default |
 | C | Money, access, the database, or the automation's own files | Nothing merges |
 

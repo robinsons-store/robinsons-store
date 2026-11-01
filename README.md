@@ -1,39 +1,70 @@
 # Robinsons General Store, Store Operations Platform
 
-Capture-first receiving app for Robinsons General Store, a Canadian general store in Dorset, Ontario. Staff drop a vendor invoice, a vision model extracts it, they confirm one screen, and it posts to the department feed with author and time. The owner sees everything remotely.
+Status: PROPOSED, 2026-10-30. Owner: the developer. Approver: Ravi Kiran.
 
-Stack: Next.js App Router on Vercel, Supabase Postgres (database, auth, storage) in a Canadian region, Claude Sonnet vision for reading invoices.
+**A capture-first operations app for Robinson's General Store in Dorset, Ontario: staff photograph
+a vendor invoice, Claude reads it into lines with a confidence on each, a person confirms the
+uncertain ones, and it posts with author and time. Around that sit the vendor ledger, invoices
+and payments, inventory, price signs, maintenance, compliance, HR and an Ask-the-store
+assistant, so the owner can run the store remotely from a phone.** To find any document, open
+[docs/README.md](docs/README.md).
 
-Private. All rights reserved, not open source. It carries the store's real vendor and operations data.
+Private. All rights reserved, not open source. It carries the store's real vendor and
+operations data.
 
-## Documentation
-- docs/STATUS.md, the current status: what is built, what is left, and what to do before real staff use. Start here.
-- RUNBOOK.md, the go-live steps and every environment variable.
-- CONTRIBUTING.md, how to work in the repo: run, conventions, branches and commits, tests, and the before-production checklist.
-- docs/ARCHITECTURE.md, the architecture and the data-flow diagrams, and how we work in Claude Code.
-- docs/DATA_SOURCES.md, the Google Drive store files and how each maps to the app.
-- robinsons_store_build_spec.md, the full plan with evidence, schema, AI layer, Canada rules, phases, and caveats.
-- .claude/skills/robinsons-store, the project skill that Claude Code loads automatically, with data-model and design-tokens references.
+## Where it runs
 
-## Quick start in Claude Code
-1. Open this folder in Claude Code. The skill loads automatically.
-2. Have ready: Supabase URL and anon key, Anthropic API key, the current Sonnet model id.
-3. Paste this as your first message, or follow the manual steps below:
+| Piece | What | State |
+|---|---|---|
+| Site | `app.robinsonsgeneralstore.ca`, Next.js App Router on Vercel, functions in Montreal | BUILT (docs/ARCHITECTURE.md section 2) |
+| Data | Supabase Postgres, Auth and Storage in Canada Central (Toronto), row-level security per store | BUILT (docs/ARCHITECTURE.md section 5) |
+| AI | Four features on the Anthropic API: invoice reader, Ask the store, reorder summary, screenshot reader | BUILT (docs/AGENTS.md) |
+| Dev site | Branch `develop`, its own Supabase project holding seed data, never the live ledger | PARTIAL (docs/ENVIRONMENTS.md) |
+| Build loop | Slack request to draft pull request, CI gates, a script that decides what may merge, health watchdog | PARTIAL: the classifier's rules are tested but it has not yet run on a live request; tier A self-merge SCAFFOLDED (docs/ARCHITECTURE.md section 6, docs/AGENTS.md) |
 
-```
-Read .claude/skills/robinsons-store, robinsons_store_build_spec.md, and docs/ARCHITECTURE.md. Then get the repo running (install, create .env.local from .env.example, start the dev server), walk me through the Supabase setup (create the project in a Canadian region, run supabase/schema.sql then supabase/seed.sql, create a public Storage bucket named documents), and once it runs we test the capture loop with a real invoice from source_data. Follow the skill's output rules and do not change the locked architecture.
-```
+## Start here
 
-## Manual setup
-1. Supabase: create a project in ca-central (Toronto). In the SQL editor run supabase/schema.sql, then supabase/seed.sql. In Storage create a public bucket named documents.
-2. Copy .env.example to .env.local and fill in NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, ANTHROPIC_API_KEY, and ANTHROPIC_MODEL (the current Sonnet model id from docs.claude.com).
-3. npm install, then npm run dev. Open http://localhost:3000, click + Capture, drop an Orgill or ABBOT invoice, Extract, fix any flagged field, Save to feed.
-4. Deploy: import the repo at vercel.com/new, set the same environment variables, deploy. Use Node 20.
+| You are | Open first |
+|---|---|
+| New to the team | [ONBOARDING.md](ONBOARDING.md), then the learning path in [docs/README.md](docs/README.md) |
+| Building or reviewing, person or AI session | [CLAUDE.md](CLAUDE.md), then [.claude/skills/robinsons-store/SKILL.md](.claude/skills/robinsons-store/SKILL.md) and its [standards](.claude/skills/robinsons-store/references/standards.md) |
+| Asking what is done | [docs/STATUS.md](docs/STATUS.md) and [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) |
+| Asking who owns which account or secret | [docs/HANDOVER.md](docs/HANDOVER.md) |
+| Setting up a database or going live | [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md) and [RUNBOOK.md](RUNBOOK.md) |
 
-## Before production
-- The dev row-level security allows anonymous access so the demo runs without login. Authentication and per-store, per-role policies are built and ship behind `NEXT_PUBLIC_REQUIRE_AUTH` (default off). To enforce them, follow "Go to enforced auth (production)" in RUNBOOK.md: enable Email auth, create accounts, link app_user.auth_id, run supabase/auth_setup.sql, then set the env var to true and redeploy. Test with one owner and one staff account first.
-- Move document storage to signed URLs if invoices contain anything sensitive.
-- The confidence value is captured per line. Add a review threshold so low-confidence dollar fields require a human before they post.
+## Run it on your machine
 
-## Phases
-Phase 1 capture and receiving is in this starter. Next: Phase 2 pricing and inventory, Phase 3 vendor ledger and payments with due-date alerts, Phase 4 manager dashboard. See docs/ARCHITECTURE.md and the build spec.
+1. `npm install`
+2. Copy `.env.example` to `.env.local` and fill in the values (RUNBOOK.md lists each one).
+   With the file blank the app still builds and starts; it simply has no data.
+3. `npm run dev`, then open http://localhost:3000.
+
+A fresh Supabase project needs `supabase/schema.sql` then `supabase/seed.sql` in the SQL
+editor; `schema.sql` also creates the `documents` bucket. The full order, including the
+scripts that upgrade a live database, is docs/SUPABASE_SETUP.md. Never point a local copy at
+the live database; use the dev project (docs/ENVIRONMENTS.md).
+
+## How a change ships
+
+Branch, draft pull request, checks (lint, `tsc --noEmit`, a blank-env build, the module checks
+and the automation tests), a person merges. CI starts by itself for pull requests into
+`main` or `develop` and for pushes to either branch [R `.github/workflows/ci.yml:3-7`].
+`main` accepts changes only through a pull request;
+Vercel deploys `main`; merged database scripts apply themselves from `supabase/run-order.txt`.
+The details, and why the automation may never merge money, access, database or automation
+changes on its own, are in [CONTRIBUTING.md](CONTRIBUTING.md) and
+[docs/LOOP_ENGINEERING.md](docs/LOOP_ENGINEERING.md).
+
+## How this maps to the rest of the docs
+
+This file only routes. Every fact above has its home in the file it links to, and
+[docs/README.md](docs/README.md) indexes them all. The original plan with evidence and
+pricing is [robinsons_store_build_spec.md](robinsons_store_build_spec.md), kept for history.
+
+**Basis: 11 claims checked this session (2026-10-30), 9 confirmed, 2 killed, 1 source.** Each
+state in the table and each step above was read from the linked file in this repository:
+ARCHITECTURE sections 2, 5 and 6, AGENTS, ENVIRONMENTS, SUPABASE_SETUP, RUNBOOK step 2,
+`.github/workflows/ci.yml` lines 4 to 7 and `supabase/run-order.txt`. Killed by a refutation
+read from a separate session: the build loop marked BUILT (the classifier is PARTIAL), and
+"every screen shows a Connection card" with blank env (several screens show none). Source:
+this repository.

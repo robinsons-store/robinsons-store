@@ -13,8 +13,9 @@ not this file.
 WHAT YOU CHECK, AND THE FAILURE EACH ONE PREVENTS
 
 1. STORE SCOPING. Every read and write carries the active store. A new table needs
-   `store_id`, RLS, and a line in auth_setup.sql section 3a. Without it, a second store sees
-   the first store's vendors.
+   `store_id`, RLS, and a line in auth_setup.sql section 3a, or section 3e and
+   supabase/money_by_role.sql if it holds a dollar figure. Without it, a second store sees the
+   first store's vendors; a money table left in 3a shows staff its amounts.
 2. MONEY FAILS CLOSED. Dollar figures render only when `canSeeMoney(role)` is true, and an
    unknown or still-loading role counts as no. Without it, a staff member sees the payables
    while the role resolves.

@@ -51,11 +51,29 @@ export default function StaffFeed() {
     const { data, error } = await query;
     if (error) setError(error.message);
     else {
-      const loaded = (data as unknown as FeedRow[]) || [];
-      setRows(loaded);
-      setThumbs(await docUrls(loaded.map((r) => r.source_file_path)));
+      setRows((data as unknown as FeedRow[]) || []);
     }
   }
+
+  // Invoice photos show prices, so only lead, manager and owner open them (the storage rules
+  // refuse staff as well); staff see a plain card, and no link is asked for on their behalf.
+  useEffect(() => {
+    if (!showMoney) {
+      setThumbs(new Map());
+      return;
+    }
+    let alive = true;
+    docUrls(rows.map((r) => r.source_file_path))
+      .then((m) => {
+        if (alive) setThumbs(m);
+      })
+      .catch(() => {
+        if (alive) setThumbs(new Map());
+      });
+    return () => {
+      alive = false;
+    };
+  }, [rows, showMoney]);
 
   useEffect(() => {
     if (!ready) return;

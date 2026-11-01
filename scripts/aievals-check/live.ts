@@ -116,7 +116,18 @@ function resolveDates(v: any): any {
 // Any other RPC is a write the case has to expect: payments only ever move through RPCs.
 const BOOKKEEPING = new Set(["ai_call_begin", "ai_call_finish"]);
 
+// The money-free views (supabase/money_by_role.sql) answer from their table with the dollar
+// columns gone, as the database does. Ask reads vendor_directory for a role that cannot see money.
+const VIEWS: Record<string, { table: string; drop: string[] }> = {
+  vendor_directory: { table: "vendor", drop: ["minimum_order_amount", "no_minimum_order"] }
+};
+
 function fakeDb(tables: Record<string, any[]>, writes: string[]) {
+  const rowsOf = (table: string): any[] => {
+    const view = VIEWS[table];
+    if (!view) return tables[table] || [];
+    return (tables[view.table] || []).map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => !view.drop.includes(k))));
+  };
   const from = (table: string) => {
     const filters: ((r: any) => boolean)[] = [];
     let inserted: any = null;
@@ -138,7 +149,7 @@ function fakeDb(tables: Record<string, any[]>, writes: string[]) {
       upsert: () => (writes.push(table), q),
       delete: () => (writes.push(table), q),
       then: (ok: any, bad: any) => {
-        const rows = inserted ? [inserted] : (tables[table] || []).filter((r) => filters.every((f) => f(r)));
+        const rows = inserted ? [inserted] : rowsOf(table).filter((r) => filters.every((f) => f(r)));
         return Promise.resolve({ data: single ? rows[0] ?? null : rows, error: null }).then(ok, bad);
       }
     };

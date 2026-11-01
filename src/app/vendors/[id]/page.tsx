@@ -26,7 +26,10 @@ import {
 } from "@/lib/vendorOrdering";
 import { asksFor, hiddenFieldCount, labelForKey, vendorSelect, visibleFacts } from "@/lib/vendorFields";
 import { asksInvoice } from "@/lib/invoiceFields";
-import type { Vendor, PurchaseOrder, Invoice, Payment, AppUser, CreditNote } from "@/lib/types";
+import { fieldDepartment } from "@/lib/departments";
+import { choicesFor, type FieldChoice } from "@/lib/fieldChoices";
+import { loadFieldChoices } from "@/lib/loadFieldChoices";
+import type { Vendor, PurchaseOrder, Invoice, Payment, AppUser, CreditNote, Department } from "@/lib/types";
 
 const ACTOR_KEY = "rgs_actor";
 const num = (s: string) => (s.trim() === "" ? null : Number(s));
@@ -51,6 +54,10 @@ export default function VendorDetail() {
   const params = useParams();
   const id = String(params?.id || "");
   const [vendor, setVendor] = useState<Vendor | null>(null);
+  // The store's departments, so a vendor filed under a section takes its department's
+  // questions, and the Department fields screen's ticks for that store.
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [fieldRows, setFieldRows] = useState<FieldChoice[]>([]);
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -127,19 +134,30 @@ export default function VendorDetail() {
   // and service category on any invoice whose vendor was not the matching department, while
   // preserving the estimate number beside them. The registry answers once, and the form,
   // the validation and the save paths all read the same answer.
-  const asksInv = (key: string) => asksInvoice(vendor?.department?.name, key);
+  //
+  // The department is the one whose questions apply: a vendor filed under a SECTION (Gifts,
+  // say) takes DryGoods & Lakeside's, the same as the add-vendor form has since 2026-08-12.
+  // Until 2026-10-25 this page used the section's own name, which matches nothing in
+  // departments.ts, so a Gifts vendor was asked DryGoods' questions when it was created and
+  // every question when it was edited. fieldDepartment walks to the top; when the department
+  // list has not loaded, the joined name is used as before.
+  const fieldDept = fieldDepartment(vendor?.department_id, departments);
+  const vendorDeptName = fieldDept?.name ?? vendor?.department?.name ?? null;
+  const fieldDeptId = fieldDept?.id ?? vendor?.department_id ?? null;
+  // The Department fields screen's ticks for that department, one set per form. The
+  // rendering, the validation and the save path below all read these same ones.
+  const vendorChoices = choicesFor(fieldRows, fieldDeptId, "vendor");
+  const invoiceChoices = choicesFor(fieldRows, fieldDeptId, "invoice");
+  const asksInv = (key: string) => asksInvoice(vendorDeptName, key, invoiceChoices);
 
-  // Which questions this vendor's department is asked. The joined name is used as it stands:
-  // a vendor filed under a SECTION (Gifts, say, rather than DryGoods) matches nothing in
-  // departments.ts and so is asked everything, which is the direction that never loses a
-  // field. That is also exactly how visibleFacts reads this page, so the display above and
-  // the form below cannot disagree about one vendor.
-  const vendorDeptName = vendor?.department?.name ?? null;
+  // Which questions this vendor's department is asked. visibleFacts reads the same
+  // department and the same choices, so the display above and the form below cannot
+  // disagree about one vendor.
   // What the form DRAWS. Null puts every question back. Validation keeps using the real
   // department name, so revealing a question does not make it mandatory.
   const askDept = showAllFields ? null : vendorDeptName;
-  const asks = (key: string) => asksFor(askDept, key, { showMoney });
-  const hiddenCount = hiddenFieldCount(vendorDeptName, { showMoney });
+  const asks = (key: string) => asksFor(askDept, key, { showMoney, choices: vendorChoices });
+  const hiddenCount = hiddenFieldCount(vendorDeptName, { showMoney, choices: vendorChoices });
 
   // What the tax select stores in hst_amount: "none" is a no-tax vendor (0), "refer to the
   // actual invoice" stores blank so the report shows it as unstated, and both "separate"
@@ -170,6 +188,12 @@ export default function VendorDetail() {
       return;
     }
     setVendor((v as unknown as Vendor) || null);
+    const vendorStore = (v as unknown as Vendor | null)?.store_id ?? null;
+    if (vendorStore) {
+      const { data: ds } = await supabase.from("department").select("id, name, accent_color, parent_department_id").eq("store_id", vendorStore);
+      setDepartments((ds as Department[]) || []);
+      setFieldRows((await loadFieldChoices(vendorStore)).rows);
+    }
     const { data: po } = await supabase.from("purchase_order").select("id, vendor_id, order_amount, ship_date, delivery_commit, status, order_filing, digital_file_location, season_year, notes, department_id").eq("vendor_id", id).is("voided_at", null).order("ship_date", { ascending: false });
     setOrders((po as unknown as PurchaseOrder[]) || []);
     const { data: inv } = await supabase.from("invoice").select("id, vendor_id, invoice_number, invoice_date, amount, hst_amount, freight_charges, tax_mode, po_number, delivery_status, delivered_date, delivery_comments, invoice_filing, digital_file_location, estimate_number, work_type, service_category, work_description, terms, due_date, status").eq("vendor_id", id).is("voided_at", null).order("due_date", { ascending: true });
@@ -256,7 +280,7 @@ export default function VendorDetail() {
     // startEditVendor, so a field this department no longer asks round-trips its saved value
     // untouched. That is rule 1 in vendorFields.ts holding on the save path.
     const answeredMinimum = !!vForm.minimum_order_amount.trim() || vForm.no_minimum_order;
-    const askMinimum = asksFor(vendorDeptName, "minimum_order", { showMoney }) || (showMoney && answeredMinimum);
+    const askMinimum = asksFor(vendorDeptName, "minimum_order", { showMoney, choices: vendorChoices }) || (showMoney && answeredMinimum);
     const minErr = askMinimum ? validateMinimumOrder(vForm.minimum_order_amount, vForm.no_minimum_order) : null;
     if (minErr) errs.minimum_order_amount = minErr;
     const reErr = validateReorder(vForm.reorder_status, vForm.reorder_comments);
@@ -968,7 +992,7 @@ export default function VendorDetail() {
             department is no longer asked that question, so changing the department map never
             looks like deleting data. */}
         {(() => {
-          const facts = visibleFacts(vendor, { showMoney, group: "ordering" });
+          const facts = visibleFacts(vendor, { showMoney, group: "ordering", departmentName: vendorDeptName, choices: vendorChoices });
           if (!facts.length) return null;
           return (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
@@ -996,8 +1020,12 @@ export default function VendorDetail() {
               {asks("rep_name") && (
                 <div><label className="label">{labelForKey("rep_name", vendorDeptName)}</label><input className="input" value={vForm.rep_name} onChange={(e) => setVForm({ ...vForm, rep_name: e.target.value })} /></div>
               )}
-              <div><label className="label">Phone</label><input className="input" value={vForm.phone} onChange={(e) => setVForm({ ...vForm, phone: e.target.value })} /></div>
-              <div><label className="label">Email</label><input className="input" value={vForm.email} onChange={(e) => setVForm({ ...vForm, email: e.target.value })} /></div>
+              {asks("phone") && (
+                <div><label className="label">Phone</label><input className="input" value={vForm.phone} onChange={(e) => setVForm({ ...vForm, phone: e.target.value })} /></div>
+              )}
+              {asks("email") && (
+                <div><label className="label">Email</label><input className="input" value={vForm.email} onChange={(e) => setVForm({ ...vForm, email: e.target.value })} /></div>
+              )}
               <div><label className="label">Status</label>
                 <select className="input" value={vForm.status} onChange={(e) => setVForm({ ...vForm, status: e.target.value })}>
                   {["active", "skip", "discontinue", "bankrupt"].map((s) => <option key={s} value={s}>{s}</option>)}
@@ -1024,8 +1052,11 @@ export default function VendorDetail() {
               errors={fieldErrors}
               showMoney={showMoney}
               departmentName={askDept}
+              choices={vendorChoices}
             />
-            <div><label className="label">Notes and rules</label><textarea className="input" rows={2} value={vForm.notes} onChange={(e) => setVForm({ ...vForm, notes: e.target.value })} /></div>
+            {asks("notes") && (
+              <div><label className="label">Notes and rules</label><textarea className="input" rows={2} value={vForm.notes} onChange={(e) => setVForm({ ...vForm, notes: e.target.value })} /></div>
+            )}
             {/* A question hidden here is not an answer deleted: the saved value rides through
                 the update untouched, and the facts above this form still show it. */}
             {hiddenCount > 0 && (
@@ -1205,7 +1236,7 @@ export default function VendorDetail() {
                 </select>
               </div>
               <div><label className="label">Invoice date</label><input className="input" type="date" value={invForm.invoice_date} onChange={(e) => setInvForm({ ...invForm, invoice_date: e.target.value })} /></div>
-              <div><label className="label">Terms</label><input className="input" value={invForm.terms} onChange={(e) => setInvForm({ ...invForm, terms: e.target.value })} /></div>
+              {asksInv("terms") && <div><label className="label">Terms</label><input className="input" value={invForm.terms} onChange={(e) => setInvForm({ ...invForm, terms: e.target.value })} /></div>}
               {asksInv("po_number") && <div><label className="label">PO number</label><input className="input" value={invForm.po_number} onChange={(e) => setInvForm({ ...invForm, po_number: e.target.value })} /></div>}
             </div>
             {asksInv("delivery") && (
@@ -1356,7 +1387,7 @@ export default function VendorDetail() {
                         <p className="help" style={{ margin: "4px 0 0" }}>Follows the payments: record one to mark paid, void one to undo.</p>
                       </div>
                       <div><label className="label">Invoice date</label><input className="input" type="date" value={editInvForm.invoice_date} onChange={(e) => setEditInvForm({ ...editInvForm, invoice_date: e.target.value })} /></div>
-                      <div><label className="label">Terms</label><input className="input" value={editInvForm.terms} onChange={(e) => setEditInvForm({ ...editInvForm, terms: e.target.value })} /></div>
+                      {asksInv("terms") && <div><label className="label">Terms</label><input className="input" value={editInvForm.terms} onChange={(e) => setEditInvForm({ ...editInvForm, terms: e.target.value })} /></div>}
                       {asksInv("po_number") && <div><label className="label">PO number</label><input className="input" value={editInvForm.po_number} onChange={(e) => setEditInvForm({ ...editInvForm, po_number: e.target.value })} /></div>}
                     </div>
                     {asksInv("delivery") && (

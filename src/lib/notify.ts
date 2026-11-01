@@ -70,11 +70,16 @@ export async function loadNotifications(storeId: string, role?: Role | null): Pr
 
   try {
     // The five checks are independent; run them together so the bell costs one round trip
-    // of latency, not five.
+    // of latency, not five. A role that cannot see money reads the invoice_due and
+    // insurance_renewal views instead of the tables: once login is on, invoice and
+    // insurance_policy return no rows to staff (supabase/money_by_role.sql), and neither view
+    // has a dollar column. Without a total the overdue item shows only its count.
     const [inv, lic, pol, task, low] = await Promise.all([
-      supabase.from("invoice").select("amount, hst_amount, freight_charges, tax_mode, due_date, status").eq("store_id", storeId).is("voided_at", null).in("status", ["unpaid", "partially_paid"]),
+      showMoney
+        ? supabase.from("invoice").select("amount, hst_amount, freight_charges, tax_mode, due_date, status").eq("store_id", storeId).is("voided_at", null).in("status", ["unpaid", "partially_paid"])
+        : supabase.from("invoice_due").select("due_date, status").eq("store_id", storeId).is("voided_at", null).in("status", ["unpaid", "partially_paid"]),
       supabase.from("licence").select("id, name, expiry_date").eq("store_id", storeId).is("voided_at", null),
-      supabase.from("insurance_policy").select("id, name, renewal_date").eq("store_id", storeId).is("voided_at", null),
+      supabase.from(showMoney ? "insurance_policy" : "insurance_renewal").select("id, name, renewal_date").eq("store_id", storeId).is("voided_at", null),
       supabase.from("maintenance_task").select("id, due_date, status").eq("store_id", storeId).is("voided_at", null).neq("status", "done"),
       lowStockCount(storeId)
     ]);
@@ -88,7 +93,7 @@ export async function loadNotifications(storeId: string, role?: Role | null): Pr
         const d = daysOverdue(r.due_date);
         if (d != null && d > 0) {
           count++;
-          total += invoiceTotal(r);
+          if (showMoney) total += invoiceTotal(r);
         }
       }
       if (count > 0) {

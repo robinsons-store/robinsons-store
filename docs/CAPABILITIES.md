@@ -60,7 +60,7 @@ Cost is stated as a fact and left there. Effort uses the same units as the rest 
 | 37 | GITHUB_TOKEN permissions on ci.yml | GitHub | LOOP_ENGINEERING | The job that only checks the code loses the ability to change it. One line. | minutes | Free |
 | 38 | Concurrency group on ci.yml | GitHub | migrate.yml single-apply safety | Two runs of the same job can never race. | minutes | Free |
 | 39 | Workflow trigger events | GitHub | LOOP_ENGINEERING loops 1, 3, 4 | Knowing that scheduled workflows switch themselves off after 60 quiet days, which would stop the watchdog over a slow winter. | minutes | Free |
-| 40 | Auto-merge for pull requests | GitHub | promote.yml owner-approval gate | Confirm the setting is on, or the owner's Approved does nothing. | minutes, verify | Free |
+| 40 | Auto-merge for pull requests | GitHub | Not used since 2026-10-30 | Nothing to switch on: promote.yml now waits for CI itself and merges with the commit pinned. | none | Free |
 | 41 | Instant Rollback | Vercel | LOOP_ENGINEERING: reverting is deliberately manual | If a change breaks the app on a busy Saturday, the store is back on the last working version in under a minute. | hours | Free |
 | 42 | Observability, base | Vercel | LOOP_ENGINEERING improvement 2 | When something breaks for a staff member there is a record to read instead of a guess. | hours (runbook lines) | Base free; Hobby keeps logs 1 hour, Pro 1 day |
 | 43 | Log Explorer | Supabase | Debugging playbook | When the owner says "it did not save yesterday", you can find out why. | none | Included; Free 1 day, Pro 7 days |
@@ -183,7 +183,7 @@ Cost is stated as a fact and left there. Effort uses the same units as the rest 
 
 **39. Workflow trigger events.** Two things to act on. Scheduled workflows auto-disable after 60 days of repository inactivity, which would quietly stop the autopilot, the promote loop and the health watchdog over a slow winter and be discovered in the August rush; keep a calendar note or a monthly manual dispatch. And never use `pull_request_target` on this repo, which is public: that trigger hands secrets to code from a stranger's fork.
 
-**40. Auto-merge.** `promote.yml` calls `gh pr merge --auto`, which needs the repository setting enabled. If it is off, the owner's Approved does nothing and it looks like nothing happened.
+**40. Promotion merge.** BUILT: `promote.yml` starts CI on the exact head commit, waits for it, confirms that `main` is still at the commit recorded before CI, and merges with the head commit pinned [R `.github/workflows/promote.yml:119-168`]. A person starts the workflow (docs/LOOP_ENGINEERING.md section 3).
 
 **41. Instant Rollback.** Write two lines into `RUNBOOK.md`: environment variables are not re-applied on rollback, and cron jobs revert to the rolled-back deployment's state. Note the Hobby limit too, which is one step back only; with a 15-minute autopilot cadence that may not reach past the bad change.
 
@@ -646,7 +646,7 @@ Do these before writing any code, because every one of them protects something t
 3. **`"regions": ["yul1"]` in `vercel.json`.** One line. It makes true a sentence the owner has already been given in writing, and it shortens every Supabase round trip from a cross-border hop.
 4. **The three spend caps.** Supabase Spend Cap, Anthropic workspace split with per-workspace limits, and the OpenAI project cap set before the first call in step 11. Ten minutes for the guarantee that a bug cannot become a bill.
 5. **Supabase hardening that costs nothing.** Turn on SSL enforcement and run one migration to prove the workflow still connects. Set the documents bucket's allowed MIME types and size ceiling. Run the Security Advisor, fix what it names, and add it to the `VERIFICATION.md` release check.
-6. **Three one-line workflow fixes.** Add `permissions: contents: read` and a concurrency block to `ci.yml`, and verify auto-merge is enabled in repository settings, because if it is off the owner's Approved quietly does nothing.
+6. **Three one-line workflow fixes.** Add `permissions: contents: read` and a concurrency block to `ci.yml`, and verify auto-merge is enabled in repository settings, because if it is off the owner's Approved quietly does nothing. (The auto-merge half is moot since 2026-10-30: item 40.)
 
 Why first: every item is reversible, none touches a screen staff use, and together they close the two failure modes that cannot be undone after the fact, which are losing the database and publishing a key.
 

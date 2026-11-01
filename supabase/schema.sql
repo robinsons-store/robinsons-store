@@ -225,7 +225,7 @@ create index credit_note_invoice_idx on credit_note(invoice_id);
 
 -- Owner suggestion box: ideas, problems, and screenshots land here instead of WhatsApp.
 -- Fresh installs get this here; existing databases get the identical table from
--- supabase/feedback.sql. ai_summary holds what the AI read off an attached screenshot.
+-- supabase/feedback.sql.
 create table feedback (
   id uuid primary key default gen_random_uuid(),
   store_id uuid references store(id),   -- multi-store
@@ -233,9 +233,8 @@ create table feedback (
   kind text not null default 'idea' check (kind in ('idea','problem','question','praise')),
   page text,                -- which screen it is about, in the author's words
   body text,
-  screenshot_path text,     -- storage path under feedback/ in the documents bucket
-  audio_path text,          -- voice recording path under feedback/
-  ai_summary text,
+  screenshot_path text,     -- storage path under <store_id>/feedback/ in the documents bucket
+  audio_path text,          -- voice recording path under <store_id>/feedback/
   status text not null default 'new' check (status in ('new','planned','done','declined')),
   created_at timestamptz default now(),
   voided_at timestamptz,
@@ -243,6 +242,38 @@ create table feedback (
 );
 create index feedback_store_idx on feedback(store_id);
 create index feedback_status_idx on feedback(status);
+
+-- What the AI read off a suggestion's screenshot, one row per suggestion. Kept apart from the
+-- suggestion because, once login is enforced, it opens only to the people who may open the
+-- screenshot (auth_setup.sql 3g). screenshot_path is the file it was read from. Existing
+-- databases get the identical table from supabase/feedback_summary.sql.
+create table feedback_summary (
+  id uuid primary key default gen_random_uuid(),
+  feedback_id uuid not null unique references feedback(id),
+  store_id uuid references store(id),   -- multi-store
+  screenshot_path text,
+  summary text not null,
+  created_at timestamptz default now()
+);
+create index feedback_summary_store_idx on feedback_summary(store_id);
+
+-- The database dates every save of a description, whatever the writer sends (auth_setup.sql 3g
+-- counts only a file saved by then).
+create or replace function public.feedback_summary_dated()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  new.created_at := now();
+  return new;
+end;
+$$;
+
+drop trigger if exists feedback_summary_dated on public.feedback_summary;
+create trigger feedback_summary_dated
+  before insert or update on public.feedback_summary
+  for each row execute function public.feedback_summary_dated();
 
 -- One row per AI model call, for the daily per-store cap (src/lib/aiUsage.ts). Metadata
 -- only: never the prompt, the store data sent with it, or the answer. Fresh installs get
@@ -263,6 +294,24 @@ create table ai_call (
   created_at timestamptz not null default now()
 );
 create index ai_call_store_day_idx on ai_call(store_id, created_at);
+
+-- Which questions each department's vendor and invoice forms ask, as chosen on the
+-- Department fields screen. No rows means the code lists in src/lib/vendorFields.ts and
+-- src/lib/invoiceFields.ts apply unchanged. Fresh installs get this here; existing databases
+-- get the identical table and its login-on policies from supabase/department_field.sql.
+create table department_field (
+  id uuid primary key default gen_random_uuid(),
+  store_id uuid not null references store(id),   -- multi-store
+  department_id uuid not null references department(id),
+  form text not null check (form in ('vendor','invoice')),
+  field_key text not null,
+  asked boolean not null,
+  updated_by uuid references app_user(id),
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  unique (department_id, form, field_key)
+);
+create index department_field_store_idx on department_field(store_id);
 
 -- Reserve one call under the store's daily cap, or refuse it, counting and inserting under a
 -- per-store lock so parallel requests cannot all fit. Definer: members write only through
@@ -777,6 +826,30 @@ begin
     execute format('alter table public.%I add column if not exists voided_by uuid references public.app_user(id);', t);
   end loop;
 end $$;
+
+-- Money-free views (ARCH-03). Staff screens read these instead of the tables that carry a dollar
+-- figure: vendor_directory has every vendor column but the minimum order, invoice_due says which
+-- invoices are open and when they fall due, insurance_renewal has policy names and dates. In the
+-- demo they read the tables directly and the open policies apply. auth_setup.sql section 3e
+-- replaces them, at the login cutover, with versions that return only the member's own store
+-- while the tables themselves close to staff.
+create or replace view public.vendor_directory with (security_invoker = true) as
+  select v.id, v.store_id, v.department_id, v.name, v.rep_name, v.phone, v.email,
+         v.products_we_carry, v.default_terms, v.status, v.notes, v.summer_order_timeline,
+         v.order_location, v.order_location_other, v.reorder_status, v.reorder_comments,
+         v.specializes_in, v.created_at, v.voided_at
+  from public.vendor v;
+
+create or replace view public.invoice_due with (security_invoker = true) as
+  select i.id, i.store_id, i.vendor_id, i.invoice_number, i.terms, i.due_date, i.status, i.voided_at
+  from public.invoice i;
+
+create or replace view public.insurance_renewal with (security_invoker = true) as
+  select p.id, p.store_id, p.name, p.renewal_date, p.voided_at
+  from public.insurance_policy p;
+
+grant select on public.vendor_directory, public.invoice_due, public.insurance_renewal
+  to anon, authenticated;
 
 -- DEV ONLY row-level security.
 -- These policies allow the anon key to read and write so the demo runs without login.

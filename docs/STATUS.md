@@ -2,7 +2,367 @@
 
 Single source for the current state of the build: what is done, what is verified, and what remains. The full vision is in robinsons_store_build_spec.md, setup is in RUNBOOK.md, and the per-feature sign-off record is in docs/VERIFICATION.md. Update this file and VERIFICATION.md in the same pull request as the work itself; if it is not recorded there, it is not done.
 
-Last updated: 2026-10-25, on branch claude/architecture-ai-call-ruleset (latest: the architecture record of the AI usage log and the main ruleset, below; before it the money-type and region record round, below; before it the handover written to the standard, with the agents register and onboarding, below; before it the handover is prepared, below; before it the dev guard of 2026-09-01, recorded late; before it the deploy scare, corrected the same day, below; before it the invoice field registry and the first automated migration, below; before it the owner's answer on the vendor question map; before it Jira switched off with its autopilot parked and the watchdog moved to Slack, below; before it the vendor field registry; before it the platform capability round, the health check naming its own fix, owner round 6, owner round 5, the domain and email integration round in docs/DOMAIN_EMAIL.md, the vetting round, the Jira backlog round, the live-demo round, and owner feedback round 3).
+Last updated: 2026-10-30, on branch claude/feedback-summary-follow-up (latest: every role passes the file check for a screenshot description, below; before it department field follow-ups, below; before it department field export error handling, below; before it screenshot descriptions follow the screenshot, below; before it the nine-diagram Miro board and separate archive, below; before it product direction and skill precedence, below; before it stored files fenced by store and role, below; before it money fenced by role at the database, below; before it PR #86 documents builder self-checks and the develop-to-main release flow, below; before it the AI view and the standards map in the architecture doc, below; before it tier A self-merge wired into the Slack loop, below; before it module checks and automation tests run in CI by convention, below; before it accounts moved, docs brought up to date and the dev environment turned on, below; before it the architecture diagrams corrected against the code, below; before it the architecture record of the AI usage log and the main ruleset, below; before it the money-type and region record round, below; before it the handover written to the standard, with the agents register and onboarding, below; before it the handover is prepared, below; before it the dev guard of 2026-09-01, recorded late; before it the deploy scare, corrected the same day, below; before it the invoice field registry and the first automated migration, below; before it the owner's answer on the vendor question map; before it Jira switched off with its autopilot parked and the watchdog moved to Slack, below; before it the vendor field registry; before it the platform capability round, the health check naming its own fix, owner round 6, owner round 5, the domain and email integration round in docs/DOMAIN_EMAIL.md, the vetting round, the Jira backlog round, the live-demo round, and owner feedback round 3).
+
+
+Department field follow-ups, 2026-10-30:
+- BUILT. The invoice check uses opposite vendor and invoice choices for unlocked terms
+  [R scripts/invoicefields-check/check.js:121-135]. Department field docs and the in-app
+  guide now describe owner edits and manager reads [R src/lib/appGuide.ts:97-101].
+- Architecture references now include the department field table, export and health checks
+  [R docs/ARCHITECTURE.md:214-216, 437-442].
+- Verification: JavaScript syntax and diff checks passed. The invoice module check needs
+  a TypeScript compile; it and the app gates were skipped because node_modules is absent.
+
+
+Department field export error handling, 2026-10-30:
+- BUILT. Export marks department fields as not set up only for missing-table codes; other read errors return a failed export [R src/app/api/export/route.ts:98]. Paging preserves the error code and table name [R src/lib/exportPaging.ts:59].
+- Verified offline: scripts/importexport-check, 36 passed; export handler with a fake database, four cases passed (two missing-table codes, a timeout code and no code). App gates deferred because node_modules is absent [V-run, local checks, 2026-10-30].
+
+The Department fields screen, 2026-10-25:
+- PARTIAL. The owner picks, per department, which questions the vendor and invoice
+  forms ask, on Admin, Department fields; managers can read the choices
+  [R src/app/department-fields/page.tsx:64, 202-210, 235-236]. It
+  answers the ask relayed on 2026-10-25 for the vendor and invoice profiles. The payment
+  profile is not on it: which payment questions should vary is open [Q: the requester].
+- The ticks live in a new store-scoped table, `department_field`, one row per changed box
+  [R supabase/department_field.sql:15]. No rows means the code lists in vendorFields.ts and
+  invoiceFields.ts apply unchanged, so merging changes no form until somebody saves.
+- Locked, whatever the screen says: a vendor's name and status
+  [R src/lib/vendorFields.ts:89]; an invoice's number, date, amount, tax, freight, filing, due
+  date and status [R src/lib/invoiceFields.ts:80]. Freight keeps its scope (not asked of
+  Payrolls & Taxes) because invoiceTotal adds a saved freight whatever the form shows. Newly
+  selectable: phone, email and notes on the vendor forms and terms on the invoice forms,
+  which the forms used to draw for everyone.
+- Sections take their department's questions on every vendor and invoice form
+  [R src/lib/departments.ts:85]. Until now the vendor page used the section's own name
+  [R src/app/vendors/[id]/page.tsx:144], so a Gifts vendor was asked DryGoods' questions when
+  it was created and every question when it was edited. One visible change follows: Garden
+  Center invoices now ask for a PO number, as Hardware's do.
+- Only the owner can change the choices (owner-only since PR #93); every store member,
+  including managers, can read them [R supabase/auth_setup.sql:170-199]
+  [R supabase/department_field.sql:43-67]. /api/health checks that the table is present
+  [R src/app/api/health/route.ts:75-77, 271-293].
+- Not yet checked: the screen against the live database and the upsert under the live
+  policies. Both are the first thing to try on the preview after merge [Q: owner].
+
+The Slack lifecycle workflow runs its scripts from the base branch, 2026-10-30:
+- `slack-lifecycle.yml` now checks out `pull_request.base.sha` on a pull request event and
+  the default branch on a CI result or a run by hand. `slack-lifecycle-stage.mjs` and
+  `slack-status.mjs` run from that checkout. Before this, a pull request event ran them from
+  the pull request's merge commit, and a run by hand from whichever branch it was started on.
+  A CI result already read the default branch; the ref now says so.
+- New `.github/scripts/slack-lifecycle.test.mjs` (21 checks) fails if the checkout loses its
+  ref, if the ref gives anything but the base for any trigger the workflow listens to, if a
+  trigger is added without a matching case, or if a script runs before the checkout.
+
+Every role passes the file check for a screenshot description, 2026-10-30 (branch
+claude/feedback-summary-follow-up; ARCH-15, ADR-005, see VERIFICATION.md):
+- A description opens only to members who may open the file it was read from, saved under that
+  name by the time the description was, lead, manager and owner included. One whose file is
+  not in storage, or that names no file, opens to nobody.
+- The database dates every save of a description, a rewrite included, so reading a replacement
+  screenshot again keeps the description open to whoever saved the new file.
+- Applies on merge: supabase/feedback_summary.sql runs again from run-order.txt and matches
+  auth_setup.sql section 3g; schema.sql has the same date trigger for fresh installs.
+- feedback_summary_test.sql has new cases for a missing file, a later file, another store's file,
+  a workbook, a description with no file, and a replaced screenshot. Verify after the merge with
+  ADR-005 condition 3.
+
+Screenshot descriptions follow the screenshot, 2026-10-25, merged and applied to the live
+database 2026-10-30 (branch claude/arch-04-feedback-summary; ARCH-15,
+docs/adr/ADR-005-screenshot-descriptions-follow-the-screenshot.md, see VERIFICATION.md):
+- The AI's description of a suggestion screenshot lives in its own table, feedback_summary, and
+  opens to the same people as the screenshot: lead, manager, owner, and the member who attached
+  it. The suggestion itself, its note and screen, opens to the whole store.
+- The screenshot reader saves as the member who asked for it and is told not to copy dollar
+  amounts, pay or personal details. Suggestions, the developer digest and the export read the
+  new table. Older descriptions moved into it and feedback.ai_summary is dropped.
+- It applies itself: supabase/feedback_summary.sql runs after documents_by_role.sql and matches
+  auth_setup.sql section 3g. Demo databases get the table open like the others. The migration
+  run on main 373b2b5 applied it to the live database.
+- Proven on Supabase Postgres 17 with the storage schema: feedback_summary_test.sql 85 of 85 on
+  a fresh install, on a copy upgraded from main, and on one upgraded from the stored-files
+  branch, 5 of 5 on demo copies; the Suggestions reads and the reader's calls through PostgREST
+  and the storage service, 33 of 33; documents and money tests still 163 and 130.
+- Verify on the live database: ADR-005 condition 3.
+
+The architecture board on the store's Miro account, 2026-10-30:
+- BUILT: "Robinsons store architecture" shows the nine diagrams of docs/ARCHITECTURE.md,
+  built in Miro from the doc's Mermaid with the same colour key and named by section and
+  date [R pr/81:docs/ARCHITECTURE.md:695].
+- The six older diagrams and their labels moved to a separate board, "Robinsons store
+  architecture, archive" [R pr/81:docs/ARCHITECTURE.md:695].
+- docs/ARCHITECTURE.md stays the source. When its Mermaid changes, redraw the matching
+  diagram on the board [R pr/81:docs/ARCHITECTURE.md:695]. docs/HANDOVER.md lists both boards.
+- Docs only; no code, schema, policy or workflow change.
+
+Product direction recorded, 2026-10-30 (branch agent-skills-setup):
+- REQUIREMENTS.md is the canonical home for product direction; CLAUDE.md and the
+  robinsons-store skill point there. Multi-store support is PARTIAL, and onboarding a
+  second store without code changes is TARGET. The configuration list includes the reorder
+  prompt and alert email branding. Docs only; no app code changed.
+
+Agent tooling, 2026-10-30 (branch agent-skills-setup):
+- AGENTS.md at the root points Codex and other agents at CLAUDE.md and the robinsons-store
+  skill, so every agent follows one set of rules. CLAUDE.md lists the skills, reviewers, MCP
+  server and Stop hook the repo carries.
+- vercel-react-best-practices is vendored from vercel-labs/agent-skills into .claude/skills
+  and .agents/skills and pinned in skills-lock.json. web-design-guidelines from the same
+  source was not taken: it downloads its rules from the network on every run.
+- The robinsons-store skill description is cut to 915 characters; the Agent Skills limit
+  is 1,024 and the old one was 1,244. The skill body now points to REQUIREMENTS.md for
+  product direction, delivery states and configuration gaps.
+- Root AGENTS.md defines skill precedence, with a pointer in CLAUDE.md. The React skill is
+  registered in docs/AGENTS.md and LOOP_ENGINEERING.md; its vendored files are unchanged.
+- Instructions and skills only; no code, schema, policy or workflow change.
+
+PR #88 promotion follow-up, 2026-10-30:
+- Promotion records main before CI, fetches it again immediately before the merge, and
+  continues only if main is unchanged. The head remains pinned with --match-head-commit.
+- README.md describes CI on both branches; ENVIRONMENTS.md requires a successful dev script
+  run before SQL promotion; LOOP_ENGINEERING.md and CAPABILITIES.md describe promotion.
+- Verification: automation tests run locally; app gates skipped because dependencies are absent.
+
+CI on `develop`; promotion merges only on green CI, 2026-10-30:
+- CI now starts by itself on every pull request into `develop` and every push to it, as on
+  `main`. Before, the documented path for app changes ran no checks unless someone started CI
+  by hand; #71, #83 and #85 target `develop`. They get a run on their next push or update from
+  `develop` once this reaches `develop`. The leftover `claude/great-johnson-CFSbi` trigger is
+  gone; that branch no longer exists on origin.
+- `promote.yml` no longer merges with `--auto`, which with no required checks on `main` could
+  merge at once. It now does what the Slack loop's tier A step does: requires `develop` to
+  hold everything on `main`, starts CI on the pull request's head commit, waits, reads the
+  pull request again, and merges with `--match-head-commit`. Anything unexpected leaves the
+  pull request open and fails the run. After the merge it starts CI on `main` and, when
+  `supabase/` changed, Apply database scripts, since a merge made with the workflow's token
+  may start neither.
+- Docs: ENVIRONMENTS.md, LOOP_ENGINEERING.md section 3, CONTRIBUTING.md, the ARCHITECTURE.md
+  promotion row (was SCAFFOLDED with no `develop`; now PARTIAL), CAPABILITIES.md item 40
+  (auto-merge no longer used), two ONBOARDING.md line references.
+- Open: the promotion has not run end to end on GitHub. First run after this merges: expect a
+  hold until `develop` is brought level with `main` (it lacks #56 today). Whether GitHub
+  starts no push workflow for a merge made with `GITHUB_TOKEN` stays `[J-open]` (ADR-002
+  context item 3); the dispatches are safe either way.
+- Tier C (`.github/`): a person merges. Then bring `develop` level with `main`, which is the
+  step that makes pull requests into `develop` show CI.
+
+PR #87 documentation follow-up, 2026-10-30:
+- Added the status line, related-docs paragraph and basis footer to docs/README.md, and
+  expanded the architecture catalogue entry for PR #81.
+- CONTRIBUTING.md points to the release checklist before real staff use.
+- Verification: local link and format checks; app gates skipped because dependencies are absent.
+
+Docs organized into one entry path, 2026-10-30:
+- docs/README.md now routes by reader (new member, builder or AI session, owner, checker),
+  lists the rules every session loads, adds a 13-step learning path (one component per
+  sitting: read the doc, open the code, answer one question) and states the six rules that
+  keep AI-written docs trustworthy. It also lists the Slack app manifest, which was missing.
+- The root README.md and CONTRIBUTING.md are rewritten. Both still described login, signed
+  URLs and the confidence gate as to-do; CONTRIBUTING also called integer cents planned, CI
+  lint and build only, and the repository untested. They now route to the current docs and
+  list every CI step.
+- docs/LOOP_ENGINEERING.md: the watchdog runs after CI, not after the deploy; the Refine
+  section no longer calls the parked Jira board the queue; Costs describes the Slack sweep;
+  two improvement items no longer mention a ticket or a dev database still to build.
+- Pointers fixed: the standards path in ARCHITECTURE.md, docs/SOURCES.md in the skill and the
+  build spec, the doc count in CLAUDE.md, the invariant count in VERIFICATION.md; a personal
+  account name removed from two evidence lines. The build spec carries a history banner.
+- Docs only; no code, schema, policy or workflow change. Tier C, because it edits CLAUDE.md,
+  the skill, LOOP_ENGINEERING.md and an ADR: a person merges.
+
+Stored files fenced by store and role, 2026-10-25 (branch claude/arch-04-stored-files; ARCH-04,
+docs/adr/ADR-004-stored-files-by-store-and-role.md, see VERIFICATION.md):
+- Who opens which stored file: invoice photos only lead, manager and owner;
+  screenshots and voice notes those three and whoever attached them. The workbook archive
+  opens to owner and manager, the roles that import. Each member sees only their own store's.
+- New files are saved under the store's folder and a kind folder. Staff still save the invoice
+  photo in their hand from Capture but do not open it again, so the home feed shows their
+  captures without a picture; a staff member's own screenshot is still read by AI. Files
+  saved before are recorded once with their store, so nothing in the bucket moves.
+- It applies itself: supabase/documents_by_role.sql runs after money_by_role.sql and matches
+  auth_setup.sql sections 3d and 3f. Demo databases stay open.
+- Proven with Supabase Postgres 17 and the Supabase storage service: documents_by_role_test.sql
+  163 of 163 on a fresh install and on a copy upgraded from main, 5 of 5 on demo copies;
+  through the storage service with the app's own client, 55 of 55 fresh and 108 of 108
+  upgraded, older files included; money_by_role_test.sql still 130 of 130.
+- After the merge: read ADR-004 condition 3 once. A page left open from before the update
+  needs a reload before it can save a file. Open: whether leads open the workbook archive.
+
+Money fenced by role at the database, 2026-10-25 (branch claude/arch-03-money-by-role; ARCH-03,
+docs/adr/ADR-003-money-by-role-at-the-database.md, see VERIFICATION.md):
+- A staff login can no longer read a dollar figure straight from the database. The nine tables
+  that carry one (vendor, purchase_order, invoice, credit_note, insurance_policy, payment,
+  payment_allocation, pay_rate, receiving_line) open only to lead, manager and owner, and the
+  payment functions refuse staff. A payment can only be allocated to an invoice in the same
+  store.
+- Staff screens read three views with no dollar column: vendor_directory (Capture's vendor
+  list, Ask), invoice_due (the bell's overdue count, the Due list) and insurance_renewal (the
+  bell's renewals, Compliance). Money roles keep reading the tables. Capture still saves priced
+  lines for staff; staff cannot read them back.
+- It applies itself: supabase/money_by_role.sql is last in run-order.txt, and auth_setup.sql
+  section 3e carries the same block so a rerun keeps money locked. Demo databases stay open.
+  Capture falls back to the vendor table if a deploy lands before the migration.
+- Proven on Supabase Postgres 17: supabase/money_by_role_test.sql passes 130 of 130 on a fresh
+  install and on a copy of main's scripts after the migration, 8 of 8 on demo copies; 48 of 48
+  app read and write paths pass through PostgREST v14.18; the AI evals pass offline, 23 of 23.
+- After the merge: nothing to run on the live database. Read the two checks in ADR-003
+  condition 3 once. The dev database runs in demo mode, so the script only adds the views
+  there. Stored files are covered by ARCH-04 (ADR-004). Staff
+  opening a manager-only screen by its address (Vendors, Payments, Reports, Employees) now see
+  an empty list.
+
+PR #86 documentation corrections, 2026-10-30:
+- BUILT: the docs distinguish the builder's self-check from independent CI; review and ship
+  never execute candidate code [R `.github/workflows/slack-autopilot.yml:193-238,308-427,435-480`].
+- BUILT: section 6 of docs/ARCHITECTURE.md shows a pull request landing on `develop`, the dev
+  preview and a person promoting to `main` [R `docs/ENVIRONMENTS.md:19-27,54-56`].
+- Slack intake is switched on since 2026-10-30 (`SLACK_REQUEST_CHANNEL` set); automatic dev
+  migrations wait for `SUPABASE_DB_URL_DEV` [R `docs/ENVIRONMENTS.md:75`].
+
+The Slack autopilot's build job only produces the commit, 2026-10-30:
+- Four jobs: find, build, review, ship [R `.github/workflows/slack-autopilot.yml:93`, `:170`,
+  `:308`, `:435`]. find reads the channel and posts the first card with the Slack token and
+  no model. build holds `ANTHROPIC_API_KEY` and a read-only token and nothing else
+  [R `:175-176`]; the builder commits, cannot push, and its commit leaves as a git bundle
+  artifact [R `:265-292`]. review and ship start on fresh runners at the workflow's own commit
+  and read the bundle as data with the new `.github/scripts/autopilot-change.mjs`.
+- The Slack token is no longer on the runner the model builds on, before or after the build.
+  The reviewers no longer read the build runner's working tree, so a gitignored file or a
+  `CLAUDE.md` the builder left there cannot reach them.
+- ship now pushes the branch and opens the draft pull request, after the review, and only
+  past the guard: a change touching `.github/` or `.claude/` is never pushed and the card
+  says a person must make it [R `:480-494`]. A file moved out of those folders counts, and
+  so does a commit not built on the base commit find read before the build (a commit on an
+  older base would carry that base's `.github/` while its diff looked clean). A push or pull request that fails says so on
+  the card instead of passing on the builder's paragraph.
+- The build starts from that base commit (`develop`'s tip when it exists), so the diff is
+  only the builder's work.
+- The builder runs the three gates as a self-check in the build job, which holds
+  `ANTHROPIC_API_KEY` [R `.github/workflows/slack-autopilot.yml:193-238`]. Independent CI,
+  started by ship on tiers A and B, repeats them without the autopilot secrets
+  [R `.github/workflows/ci.yml:28-44`]. review and ship never execute candidate code; they
+  read the bundle as data and run scripts from the workflow's own commit.
+- Tests: `autopilot-change.test.mjs` (new, 34, real repositories and bundles),
+  `slack-autopilot.test.mjs` (86, rewritten for four jobs), `autopilot-review.test.mjs` (55).
+  PARTIAL until the first live request runs through all four jobs.
+
+Two read-only reviewers read every Slack pull request, 2026-10-30:
+- The autopilot is built but not running: `SLACK_BOT_TOKEN` and `ANTHROPIC_API_KEY` are set,
+  `SLACK_REQUEST_CHANNEL` is not, so every sweep stops at its first step. Setting that one
+  variable, with the bot invited to the channel, switches it on (docs/SLACK_AUTOPILOT.md).
+- A new `review` job sits between build and ship, on a fresh runner at the workflow's own
+  commit, with a read-only token. It lays the pull request out as data with agent instruction
+  files removed and runs money-reviewer and invariant-auditor as two read-only model runs
+  without the Slack text. No verdict line counts as not passed.
+- Ship now needs both verdicts to pass, on the same commit, before tier A may merge itself;
+  puts the verdicts on the pull request and the reports in the Slack thread (the repository
+  is public); starts CI on tier A and B pull requests that did not go through the merge step;
+  and sets the card from a tested script, `.github/scripts/autopilot-review.mjs`, which also
+  carries the builder's own closing paragraph to Slack as its prompt promised.
+- `slack-status.mjs` can post one extra thread reply (`DETAIL_FILE`) for the reports.
+- docs/SLACK_AUTOPILOT.md, ARCHITECTURE.md section 6, AGENTS.md, LOOP_ENGINEERING.md,
+  HANDOVER.md (Slack row now PARTIAL) and the skill updated in the same change. The store's
+  Miro board needs section 6 redrawn (ARCH-12).
+
+AI view and standards map in the architecture doc, 2026-10-30:
+- docs/ARCHITECTURE.md has a new section 8, AI: one diagram of how a photo or question reaches
+  the model and what checks its answer, a layer table (model, one door, prompt fence, output
+  contract, grounding, human confirmation, cost cap, logging, evals, residency, retrieval) and
+  the AI risks by their OWASP and NIST names. Old sections 8 to 10 are now 9 to 11.
+- A table at the top names the notation or standard each view follows (C4 levels 1 and 2,
+  UML sequence and state, crow's foot ER, DORA, PIPEDA, OWASP, NIST AI RMF, ISO/IEC/IEEE 42010,
+  arc42). Names only; no conformance claimed.
+- Found: the store name and town are written into the Ask, reorder and alert prompts
+  (ARCH-13, blocks a second store). The AI evals have never run against the model (ARCH-14).
+- Two more views and a colour key: a target context in section 1 (email intake, QuickBooks,
+  point of sale, Google Sheets sync, Slack questions, a search index, a second store, each
+  with its state and what it waits on) and an AI enablement view in section 8 (Suggestions,
+  the requirements ledger, the rules and templates every Claude session loads, the Slack
+  autopilot). Colour means state only: plain BUILT, amber dashed SCAFFOLDED, grey dashed
+  TARGET; planned pieces stay on the diagrams instead of being dropped.
+- The Slack autopilot was switched on 2026-10-30 (`SLACK_REQUEST_CHANNEL` set at 20:57 UTC,
+  read live). Slack questions and automatic filing of asks are the developer's stated
+  direction with no design yet.
+- The store's Miro board now has all nine diagrams, with the colour key, built in Miro from the doc's Mermaid and
+  named "N. Section, 2026-10-30". The six older ones moved to a separate board, "Robinsons
+  store architecture, archive" (ARCH-12 closed).
+- Docs only; no code, schema, policy or workflow change.
+
+
+
+Tier A self-merge wired into the Slack loop, 2026-10-24 (ADR-002, closes ARCH-10):
+- The Slack autopilot now runs the tier classifier on every pull request it opens, labels it
+  `tier-a`, `tier-b` or `tier-c`, and comments why. It does this in a second job on a fresh
+  runner, from the workflow's own commit, against the pull request's real base; the build job's
+  token can only push and open pull requests [R `.github/workflows/slack-autopilot.yml:68-79`,
+  `:197-282`]. PARTIAL until the first live request shows a label.
+- Tier A (words only, 300 lines or fewer) merges itself after CI passes on its exact head
+  commit, with the pull request read again and the merge pinned to that commit; anything
+  unexpected leaves it for a person [R `.github/workflows/slack-autopilot.yml:284-343`].
+  SCAFFOLDED: off until the repository variable `AUTOMERGE_TIER_A` is `true`. Before setting
+  it, see ADR-002 conditions 2 to 4.
+- Instructions and configuration are never words, whatever the switch: every agent
+  instruction file by name at any depth (CLAUDE.md, AGENTS.md with docs/AGENTS.md, GEMINI.md,
+  SKILL.md and the like), agent folders, `skills-lock.json`, LOOP_ENGINEERING.md, `docs/adr/`,
+  and any `.sql`, manifest or config file are tier C. Words means `.md` and `.txt` under
+  `docs/` and `.md` at the root, as plain text; scripts, pages, images, links and binary files
+  are tier B, as is the in-app guide [R `.github/scripts/classify-change.mjs:25-79`].
+- The rules are pinned by `classify-change.test.mjs`, 110 cases, run in CI
+  [V-run, `node .github/scripts/classify-change.test.mjs`, 2026-10-30: 110 passed].
+- Open: whether GitHub's `GITHUB_TOKEN` rule is what kept CI off Slack pull requests, and
+  whether a dispatched CI run on main wakes the post-deploy watch [J-open, kill conditions in
+  ADR-002]. The merge step fails closed either way. The parked Jira loop still merges with
+  `--auto`; replace that step before waking it (ADR-002 condition 5).
+
+Module checks and automation tests run in CI by convention, 2026-10-30:
+- CI's new "Module checks" step runs every `scripts/*-check/run.sh` in name order and stops
+  at the first failure. "Automation rules" now runs every `.github/scripts/*.test.mjs` in a
+  loop instead of a hand-kept list. A new check or test needs no `ci.yml` edit.
+- `scripts/vendorfields-check` (the money-field gate) and `scripts/invoicefields-check` (the
+  department matrix) each gained a `run.sh` and now run on every pull request; before this
+  they ran only by hand. The `run.sh` contract is in the vendorfields-check README.
+- The checks already in CI with their own steps (extraction, Ask grounding, AI evals, AI
+  usage, import and export) are unchanged. Commit 2f4b1ea.
+
+Accounts moved, docs brought up to date, dev environment turned on, 2026-10-30:
+- The move to the store's accounts is done and the docs now say so: the Vercel project is
+  on the store's team `robinsons-store1` and the code is at `robinsons-store/robinsons-store`,
+  read live today. docs/HANDOVER.md is now the register of what the store owns and every
+  secret, with eight open items (A-01 to A-08) in place of the move's steps. The two
+  step-by-step move notes under docs/owner-notes/ are deleted; ADR-001 is ACCEPTED with its
+  outcome recorded. ONBOARDING, PLATFORM, REQUIREMENTS, AGENTS, ARCHITECTURE, DOMAIN_EMAIL,
+  RUNBOOK, the docs index, the skill and CLAUDE.md no longer describe the move as pending.
+- Still open and not part of the move: Supabase was on Free when last read and the Vercel
+  plan is unconfirmed (A-01, both platform risks stay open); the Anthropic key in Vercel is
+  the original from 2026-05-29 and `CRON_SECRET` is not set in Vercel (A-02).
+- The Vercel diagnose and protect workflows asked the old personal team, so they would have
+  answered "not found" since the move. They now ask the store's team, or `VERCEL_TEAM_ID`
+  when that variable is set.
+- Dev environment: still not on (no `develop` branch, no dev database). Found today: every
+  pull request preview read and wrote the live database, because the Supabase URL and key
+  targeted Preview as well as Production. Fixed the same day, and dev is now on: Supabase
+  project `robinsons-store-dev` (Canada Central) loaded from main with schema, seed,
+  seed_dev and every run-order script (2 stores, 46 vendors, 37 invoices, RLS on every
+  table, columns identical to production apart from the login column); Vercel Preview reads
+  it and Production alone reads the live database; branch `develop` exists and deploys to
+  robinsons-store-git-develop-robinsons-store1.vercel.app. `DEV_URL` is set. Still open for
+  admin@: the `SUPABASE_DB_URL_DEV` secret, which holds the dev database password. Dev runs
+  in open demo mode while production enforces login. docs/ENVIRONMENTS.md is rewritten around one Vercel
+  project (Preview becomes dev) instead of two.
+
+Architecture diagrams corrected against the code, 2026-10-30:
+- An edge-by-edge check of the six diagrams in docs/ARCHITECTURE.md against main found arrows
+  the code does not back. Corrected: the watchdog calls the app, not the database; the build
+  calls Anthropic from GitHub Actions; admin users, alerts, health and import use the service
+  role; the capture loop has a manual branch and the AI usage cap; `edit_payment` can move a
+  paid invoice to post-dated; store and vendor links are nullable; the watchdog runs when CI
+  finishes, not on deploy; the Slack card reaches "live" only by hand.
+- Section 7 now names the two routes that take no session (health, alerts) and that extract
+  returns line costs to any signed-in member. Five stale line references fixed.
+- At that check, the store's Miro board still showed the old diagrams (ARCH-12). CLOSED
+  2026-10-30: the nine-diagram board and separate archive are recorded above.
+- Docs only; no code, schema, policy or workflow change.
 
 Ask in Slack, 2026-10-30 (branch claude/slack-answers-2d32e7, ADR-006):
 - A question that names the bot in the requests channel is answered in its thread from the
@@ -59,11 +419,9 @@ Pull requests on main and a read-only Supabase MCP config, 2026-10-24 (branch re
   conventions (model failures return a non-2xx status) now match.
 
 The handover written to the standard, 2026-10-24:
-- docs/HANDOVER.md now names exactly what the store will own and under which names (team,
-  organization, roles, billing), all opened with admin@robinsonsgeneralstore.ca, with a
-  progress table and open items HO-01 to HO-07. ADR-001 records the decision itself for
-  Ravi Kiran to approve. Nothing has moved yet: read live today, Supabase is still on Free and
-  the Vercel project is still on the developer's personal team.
+- docs/HANDOVER.md and ADR-001 recorded that every account is opened with
+  admin@robinsonsgeneralstore.ca and owned by the store. The move itself is done; see the
+  2026-10-30 entry above.
 - docs/AGENTS.md registers every agent: four inside the app for staff (invoice reader, Ask the
   store, reorder summary, suggestion screenshot reader) and the build side (Slack autopilot,
   lifecycle, tier classifier, watchdog, two reviewer agents, the stop hook, parked Jira).
@@ -74,7 +432,6 @@ The handover written to the standard, 2026-10-24:
   statements, now fixed: the skill described the login cutover as still to do, gave 1062 Main
   St, described money as integer cents, listed three agents of four, and CLAUDE.md said AI
   routes run at low temperature when none sets a temperature.
-- docs/owner-notes/handover-call-agenda.md is the run sheet for the handover call.
 - docs/ARCHITECTURE.md rebuilt to the standard: numbered sections, nine routes not four,
   context and container diagrams with the automation and the custom domain, the capture
   sequence corrected (the file uploads before the database writes, and the writes are
@@ -83,7 +440,7 @@ The handover written to the standard, 2026-10-24:
   logins are made: dollar amounts are hidden from staff by the app and API only, because the
   database policies are scoped by store and not by role (ARCH-03, blocking); and invoice files
   are readable by any signed-in member of any store (ARCH-04, harmless while there is one
-  store). It also found that nothing runs the tier classifier now that Jira is parked. Later the same day, Montreal was confirmed and ARCH-01 closed: `x-vercel-id` reads `<edge>::<function region>::<id>` and answered `cle1::yul1::...`, so the region checks in HANDOVER and the checklist now test the second field, not "starts with yul1".
+  store). It also found that nothing runs the tier classifier now that Jira is parked. Later the same day, Montreal was confirmed and ARCH-01 closed: `x-vercel-id` reads `<edge>::<function region>::<id>` and answered `cle1::yul1::...`, so region checks test the second field, not "starts with yul1".
 
 What leaves Canada, written down, 2026-10-24 (branch ai-data-flows, see VERIFICATION.md):
 - docs/PLATFORM.md "What leaves Canada": one row per flow (the four Anthropic routes, the
@@ -107,10 +464,8 @@ What leaves Canada, written down, 2026-10-24 (branch ai-data-flows, see VERIFICA
 - Open: the owner's published page changes only when the developer republishes it.
 
 The handover is prepared, 2026-10-18:
-- docs/HANDOVER.md now registers who holds every account, what it costs after the move, and
-  the order to move each one to the store, with the full list of secrets and variables and
-  the checks that prove the move worked. The store already owns its domain; hosting,
-  database, code, the AI key and the Slack app are still on accounts the developer opened.
+- docs/HANDOVER.md first registered every account and the full list of secrets and
+  variables. The move it planned is done; see the 2026-10-30 entry above.
 - Read live the same day, not copied from older docs: Supabase is on **Free** (no backups;
   PLATFORM.md risk 2 is now confirmed, not suspected), Vercel is on a personal **Hobby** team
   (risk 1), and the last production deploy was the merge of PR #54 on 2026-09-01, Ready.
@@ -123,8 +478,6 @@ The handover is prepared, 2026-10-18:
   active Jira board; RUNBOOK.md still named a deleted branch.
 - Open and urgent: the domain was due to renew 2026-10-16 and nobody has seen it renew. The
   watchdog would not catch a lapse while `PRODUCTION_URL` is unset. Check the Vianet panel.
-- The dev environment is still not stood up (no `develop` branch). HANDOVER.md Step 6 builds
-  it straight onto the store's accounts, so it is done after the move, not before.
 
 The dev guard, 2026-09-01 (PR #54, recorded here late):
 - Before any script runs against dev, `.github/scripts/distinct-databases.mjs` compares
@@ -492,7 +845,7 @@ Cross-cutting
    exists, so staff logins are still to be made, from the Team page once
    `SUPABASE_SERVICE_ROLE_KEY` is set in Vercel.
 3. Owner: set the Resend key and alert addresses so due-date emails send. Do it under the
-   store's own Resend account (docs/HANDOVER.md Step 5).
+   store's own Resend account (docs/HANDOVER.md, Resend row).
 4. Owner: delete or redact the Lawson "PO Details.docx" in Drive; it holds a full credit card number in plain text. Never import it.
 
 Both build gates shipped 2026-07-07 on the owner's make-it-production-ready instruction:
@@ -528,7 +881,7 @@ A payments system (vendor payouts with allocations, partial and post-dated payme
 ## Open items (polish, tractable)
 - AI call hardening, 2026-10-24 (branch ai-call-hardening, see VERIFICATION.md): all four AI
   routes go through src/lib/anthropic.ts (25s timeout, 45s on extract, two retries on
-  429/529/5xx, refusal and cut-off read from stop_reason, maxDuration 60). Screens show plain
+  429, 529 and 500, 502, 503, 504, refusal and cut-off read from stop_reason, maxDuration 60). Screens show plain
   messages only; provider detail goes to the function log as metadata, never content. Reorder
   failures are now 502, not 200. Extract output is value-checked and anything coerced drops to
   confidence 0. Store data, questions and notes are fenced as data in every prompt.
@@ -536,10 +889,10 @@ A payments system (vendor payouts with allocations, partial and post-dated payme
   set for extract and ask, a grounding check on vendor names in Ask answers, and prompt caching
   for the Ask system prompt.
 - Ask grounding and caching, 2026-10-24 (#59, see VERIFICATION.md): two of the left-for-later
-  items above are done. Ask withholds any answer that names a vendor not in the store data or
-  the app guide, and shows "Not confirmed" with a plain message instead
-  (src/lib/askGrounding.ts, scripts/askgrounding-check, in CI). The question never vouches
-  for a name: it only excuses one in an answer with no digits ("Costco is not on file"). The
+  items above are done. Ask checks vendor names mentioned in answers against the store data
+  and app guide, withholding an unsupported answer with "Not confirmed" and a plain message
+  (src/lib/askGrounding.ts, scripts/askgrounding-check, in CI). The question excuses unsupported
+  names only if all occur in the question and the answer has no figures (no digits, as in "Costco is not on file"). The
   model wraps vendor names in [[ ]] for the check; the brackets never reach the screen.
   Unwrapped names are caught only with a legal suffix or after "vendor", "supplier", or
   "order from", so an unwrapped made-up vendor with neither still gets through. Ask now
@@ -609,7 +962,7 @@ A payments system (vendor payouts with allocations, partial and post-dated payme
 5. Second store: seed a few maintenance, HR, and compliance rows so its screens are not empty.
 6. ~~Reorder and extract API routes: return 200 with a clear message on a model error instead of 502.~~ Reversed 2026-10-24 by PR #58: every AI route returns a non-2xx status on a model failure (502, or 422 for a refusal on Ask) with the plain sentence from `failureMessage()` in `src/lib/anthropic.ts`.
 7. Decide whether the Acting-as user list stays store-wide or scopes per store.
-8. Storage policy scopes to the bucket, not the store: a signed-in member of store two could read store one's documents. Fine while both stores are the same owner; scope object paths by store before onboarding an outside store.
+8. Stored files are scoped by store and role (ADR-004, merged 2026-10-30).
 9. View as previews navigation and home, not money hiding; verifying what staff see still needs signing in as (or acting as) a staff member.
 10. Import: if a bookings import fails partway, the vendors already inserted are skipped on re-run and their missing children are not backfilled. Re-import after deleting the partial vendors, or add child-level idempotency.
 11. Vendor detail loads by id without checking the vendor belongs to the active store (harmless single-store; the DB policies enforce it once auth is on).
@@ -631,3 +984,8 @@ A seven-dimension audit (store scoping, money gating, actor and audit integrity,
 
 ## Run and deploy
 See RUNBOOK.md. Pushing to main auto-deploys to Vercel; each pull request gets a preview. The verification record and re-verification rules are in docs/VERIFICATION.md.
+
+**Basis (Miro update, 2026-10-30): 3 claims checked, 3 confirmed, 0 killed, 1 source.**
+The current board, archive and redraw rule match ARCH-12 in
+`git show pr/81:docs/ARCHITECTURE.md` (line 695). This is a document comparison, not a new
+live board check.

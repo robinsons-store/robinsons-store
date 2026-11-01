@@ -273,9 +273,15 @@ export type Feedback = {
   body: string | null;
   screenshot_path: string | null;
   audio_path: string | null;
-  ai_summary: string | null;
   status: "new" | "planned" | "done" | "declined";
   created_at: string;
   voided_at?: string | null;
   author?: { full_name: string | null } | null;
+};
+
+// What the AI read off a suggestion's screenshot. Its own table: with login enforced it opens
+// only to the people who may open that screenshot (supabase/auth_setup.sql 3g).
+export type FeedbackSummary = {
+  feedback_id: string;
+  summary: string;
 };

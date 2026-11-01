@@ -14,9 +14,11 @@
 // Grocery plus a PO number; Maintenance Payments keeps who the contractor is and what they
 // specialize in.
 //
-// HOW TO CHANGE THE MAP. The `departments` line on each field below is DATA, not structure.
-// If the owner says Hardware should be asked for a summer order timeline, that is one edit
-// to one array and nothing else moves.
+// HOW TO CHANGE THE MAP. Only the owner changes it on the Department fields screen (Admin).
+// Managers can read it. Ticks are stored in department_field and passed here as `choices`
+// (fieldChoices.ts). The `departments` line on each field below is now the
+// USUAL answer, what a department gets until somebody changes a box, and it is still DATA: a
+// new default is one edit to one array. A field marked `locked` ignores the screen.
 //
 // The map was seeded from his workbook census as a guess, and on 2026-08-13 he marked up the
 // table in docs/owner-notes/vendor-fields-requirement.html and confirmed every line of it,
@@ -34,6 +36,7 @@
 
 import type { Vendor } from "@/lib/types";
 import { canonicalDepartment } from "@/lib/departments";
+import type { FieldChoices } from "@/lib/fieldChoices";
 import { minimumOrderLabel, orderLocationLabel, REORDER_STATUS } from "@/lib/vendorOrdering";
 
 export type VendorFieldGroup = "identity" | "contact" | "trade" | "ordering" | "service";
@@ -57,6 +60,11 @@ export type VendorField = {
   detail?: (v: any) => string | null;
   /** Shown even when blank, because its absence is itself information. */
   alwaysShow?: boolean;
+  /**
+   * Asked of every department whatever the Department fields screen says, because a save
+   * path depends on it. Only meaningful with `departments: "all"`.
+   */
+  locked?: boolean;
 };
 
 const MERCHANDISE = ["DryGoods & Lakeside", "Hardware", "Grocery"];
@@ -76,7 +84,9 @@ export const VENDOR_FIELDS: VendorField[] = [
     columns: ["name"],
     departments: "all",
     value: (v) => text(v.name),
-    alwaysShow: true
+    alwaysShow: true,
+    // Both vendor forms refuse to save without it.
+    locked: true
   },
   {
     key: "status",
@@ -88,7 +98,9 @@ export const VENDOR_FIELDS: VendorField[] = [
     // Shown even when blank: "we stopped buying from them" is worth seeing on every vendor,
     // and a bankrupt supplier is not a detail to leave off a light form.
     value: (v) => text(v.status),
-    alwaysShow: true
+    alwaysShow: true,
+    // Every save writes it, and the directory chips and Ask-the-store read it.
+    locked: true
   },
   {
     key: "phone",
@@ -230,7 +242,21 @@ export function labelForKey(key: string, departmentName: string | null | undefin
   return field ? labelFor(field, departmentName) : key;
 }
 
-function appliesTo(field: VendorField, departmentName: string | null | undefined): boolean {
+function appliesTo(
+  field: VendorField,
+  departmentName: string | null | undefined,
+  choices?: FieldChoices
+): boolean {
+  // No department is "ask everything": the button that puts every question back passes null
+  // on purpose, and a vendor not filed anywhere yet has no department to have chosen for.
+  // Nothing on the Department fields screen overrides it.
+  if (!(departmentName || "").trim()) return true;
+  // The owner's tick on the Department fields screen beats the code list, except on a locked
+  // question, which a save path depends on.
+  if (!field.locked) {
+    const chosen = choices?.get(field.key);
+    if (chosen !== undefined) return chosen;
+  }
   if (field.departments === "all") return true;
   const canon = canonicalDepartment(departmentName);
   // Rule 2: an unrecognised department (Chip Stand, Checkouts, anything new) gets every
@@ -246,11 +272,11 @@ function appliesTo(field: VendorField, departmentName: string | null | undefined
  */
 export function fieldsForEntry(
   departmentName: string | null | undefined,
-  opts: { showMoney: boolean; group?: VendorFieldGroup }
+  opts: { showMoney: boolean; group?: VendorFieldGroup; choices?: FieldChoices }
 ): VendorField[] {
   return VENDOR_FIELDS.filter(
     (f) =>
-      appliesTo(f, departmentName) &&
+      appliesTo(f, departmentName, opts.choices) &&
       (!f.money || opts.showMoney) &&
       (!opts.group || f.group === opts.group)
   );
@@ -268,7 +294,7 @@ export function fieldsForEntry(
  */
 export function hiddenFieldCount(
   departmentName: string | null | undefined,
-  opts: { showMoney: boolean }
+  opts: { showMoney: boolean; choices?: FieldChoices }
 ): number {
   return fieldsForEntry(null, opts).length - fieldsForEntry(departmentName, opts).length;
 }
@@ -281,18 +307,31 @@ export function hiddenFieldCount(
  * person at the counter gets an error pointing at a box that is not on their screen. One
  * predicate, used by both, is what stops those two answers drifting apart.
  *
- * Passing null for the department is how a form offers every question at once: null is the
- * unrecognised-department case from rule 2, which already means "ask everything".
+ * Passing null for the department is how a form offers every question at once: null means
+ * "ask everything", and no choice on the Department fields screen overrides it.
+ *
+ * `choices` are that screen's ticks for this department (choicesFor in fieldChoices.ts).
+ * The money gate is checked first and cannot be ticked back on: a role that cannot see money
+ * is never asked a money question.
  */
 export function asksFor(
   departmentName: string | null | undefined,
   key: string,
-  opts: { showMoney: boolean }
+  opts: { showMoney: boolean; choices?: FieldChoices }
 ): boolean {
   const field = VENDOR_FIELDS.find((f) => f.key === key);
   if (!field) return false;
   if (field.money && !opts.showMoney) return false;
-  return appliesTo(field, departmentName);
+  return appliesTo(field, departmentName, opts.choices);
+}
+
+/**
+ * What the code list alone says, before any choice on the Department fields screen.
+ * That screen shows it as "usual" so the owner can see what a box was before it changed.
+ */
+export function asksByDefault(departmentName: string | null | undefined, key: string): boolean {
+  const field = VENDOR_FIELDS.find((f) => f.key === key);
+  return !!field && appliesTo(field, departmentName);
 }
 
 export type VendorFact = { field: VendorField; label: string; text: string; detail: string | null };
@@ -306,12 +345,16 @@ export const NOT_ON_FILE = "Not on file";
  * Rule 1 lives here: a field carrying an answer is returned even when the department map
  * says its department is not asked that question. Hiding a question must never hide an
  * answer, or a vendor recorded before a map change would appear to have lost data.
+ *
+ * `departmentName` is the department whose questions apply, when the caller has resolved a
+ * section to its parent (fieldDepartment in departments.ts). It falls back to the vendor's
+ * own joined department.
  */
 export function visibleFacts(
   vendor: any,
-  opts: { showMoney: boolean; group?: VendorFieldGroup }
+  opts: { showMoney: boolean; group?: VendorFieldGroup; departmentName?: string | null; choices?: FieldChoices }
 ): VendorFact[] {
-  const departmentName = vendor?.department?.name ?? null;
+  const departmentName = opts.departmentName !== undefined ? opts.departmentName : vendor?.department?.name ?? null;
   const out: VendorFact[] = [];
   for (const f of VENDOR_FIELDS) {
     if (opts.group && f.group !== opts.group) continue;
@@ -326,7 +369,7 @@ export function visibleFacts(
     //
     // The second half of this used to be `if (value === null) continue`, which made the flag
     // do nothing at all. No screen had noticed because no ordering field sets it.
-    if (value === null && !(f.alwaysShow && appliesTo(f, departmentName))) continue;
+    if (value === null && !(f.alwaysShow && appliesTo(f, departmentName, opts.choices))) continue;
     out.push({
       field: f,
       label: labelFor(f, departmentName),

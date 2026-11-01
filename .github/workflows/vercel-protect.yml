@@ -38,7 +38,7 @@ jobs:
       - name: Read, and in apply mode write, the firewall
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          TEAM_ID: team_Aj8Hn8jG6RAIKdixSLzls0BN
+          TEAM_ID: ${{ vars.VERCEL_TEAM_ID || 'team_pEEbrKESMFC4HpgFi3pa26P8' }}
           PROJECT_ID: prj_sDGCXtpmypc0d3qw0ylbO1rnWqeo
           MODE: ${{ inputs.mode }}
         run: |

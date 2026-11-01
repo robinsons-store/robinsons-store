@@ -1,5 +1,8 @@
 # Robinsons General Store, Consolidated Build Spec (v2.1)
 
+> **Kept for history.** This is the original plan. Where it disagrees with docs/STATUS.md,
+> docs/ARCHITECTURE.md or the skill, those win. The index to the current docs is docs/README.md.
+
 Single source of truth for the build. Merges three inputs: the research report (Drive read, technology evaluation, pricing, UX citations, Canada tax), the v1 product requirements doc (capture-first design, modules, first slice), and the color and interface guide (color system). Read this to build and to run the call.
 
 ## What changed from v2 to v2.1
@@ -13,7 +16,7 @@ Turn the store's paper, Excel, and the knowledge in Ravi's head into a structure
 ---
 
 ## 2. Evidence from the Drive folder
-Read of the StoreApplication folder and its subfolders. Live links, private to the owner's Google account: StoreApplication https://drive.google.com/drive/folders/1liGWxXw_dgQygF9NhNGiuBFObdrhmBz8 , Bookings https://drive.google.com/drive/folders/19aGReT42XHVaQhGAf1p9CFOwodshyQcJ , Orgill https://drive.google.com/drive/folders/1uadEQ_vzfr_a4oTZSpOnh-RyTbYqOa1X . See docs/SOURCES.md for how to load them into Claude Code.
+Read of the StoreApplication folder and its subfolders. Live links, private to the owner's Google account: StoreApplication https://drive.google.com/drive/folders/1liGWxXw_dgQygF9NhNGiuBFObdrhmBz8 , Bookings https://drive.google.com/drive/folders/19aGReT42XHVaQhGAf1p9CFOwodshyQcJ , Orgill https://drive.google.com/drive/folders/1uadEQ_vzfr_a4oTZSpOnh-RyTbYqOa1X . See docs/DATA_SOURCES.md for how to load them into Claude Code.
 
 - **LakeSide&DryGoods/** holds the crown jewel: 2026 bookings L_S & Dry goods.xlsx. A multi-tab vendor and order ledger with these columns: Vendor Company, Rep Name, Contact No, Email, Products We Carry, Order Status for 2026, Comments, Order-Confirmation Filing Method, Amount, Ship Date, Delivery Status, Delivery Comments, Final-Invoice Filing Method, Invoiced Amount, Terms, Due Date, Payment Status, Payment Date, Payment-Confirmation Filing. It covers Dry Goods and Gifts (about $158,412.20 ordered, $122,219.15 invoiced), a Faith in the Forest clothing section (about $63,363.79 ordered, $38,444.24 invoiced), and a Grocery vendor section. Roughly 120 vendors total. This spreadsheet is the v1 schema and the test data.
 - **InvoiceFiles&PaymentConfirmations/** holds two reference docs that list the email subject lines they search to find invoices and payment confirmations (for example BAT Invoice from Imperial Tobacco that does not filter accurately, Remittance Advice 0056138871, a DGS Distribution ice cream receipt). The current system is Gmail search by subject line.

@@ -23,6 +23,8 @@
 //   - Nothing here ever fails the run. The build either happened or it did not; a Slack
 //     outage must not turn finished work into a red run somebody re-runs.
 
+import { existsSync, readFileSync } from "node:fs";
+
 const TOKEN = (process.env.SLACK_BOT_TOKEN || "").trim();
 const CHANNEL = (process.env.SLACK_REQUEST_CHANNEL || "").trim();
 const THREAD_TS = (process.env.THREAD_TS || "").trim();
@@ -30,6 +32,9 @@ const STAGE = (process.env.STAGE || "").trim();
 const REQUEST = (process.env.REQUEST || "").trim();
 const URL_ = (process.env.LINK || "").trim();
 const NOTE = (process.env.NOTE || "").trim();
+// Optional. A file whose text is posted once as a plain reply under the card: the reviewers'
+// reports. Kept out of the card so the card stays a status, not a wall of findings.
+const DETAIL_FILE = (process.env.DETAIL_FILE || "").trim();
 
 /** How the card knows which message is its own. Invisible enough not to read as clutter. */
 export const MARKER = "Request status";
@@ -203,6 +208,12 @@ async function main() {
   }
   const want = (STAGES[STAGE] || STAGES.picked_up).reaction;
   await setReaction(want);
+  const detail = DETAIL_FILE && existsSync(DETAIL_FILE) ? readFileSync(DETAIL_FILE, "utf8").trim() : "";
+  if (detail) {
+    // Slack stops rendering a single message well somewhere past 4,000 characters.
+    const text = detail.length > 3900 ? detail.slice(0, 3899) + "…" : detail;
+    await slack("chat.postMessage", { channel: CHANNEL, thread_ts: THREAD_TS, text });
+  }
   // Names the channel and the message, so anybody reading this log can open exactly the
   // thing it claims to have written and see for themselves.
   console.log(`Status is now "${STAGE}" on ${CHANNEL} thread ${THREAD_TS}, reaction :${want}:`);

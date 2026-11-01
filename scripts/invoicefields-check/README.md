@@ -13,17 +13,21 @@ it, so correcting an amount can no longer erase a fact.
 
 ## Running it
 
+CI runs this through `run.sh`, in the "Module checks" step, so a red result blocks the
+merge. Run it from the repo root:
+
 ```sh
-npx tsc -p scripts/invoicefields-check/tsconfig.json
-python3 - <<'PY'
-import re, glob, os
-for f in glob.glob("scripts/invoicefields-check/out/*.js"):
-    s = open(f).read()
-    open(f, "w").write(re.sub(r'require\("@/lib/([^"]+)"\)', r'require("./\1")', s))
-PY
-cp scripts/invoicefields-check/check.js scripts/invoicefields-check/out/
-node scripts/invoicefields-check/out/check.js
+bash scripts/invoicefields-check/run.sh
 ```
 
-Not wired into the commit gates; run it whenever `invoiceFields.ts` or `departments.ts`
-changes. The department matrix at the top of check.js is the contract.
+`run.sh` compiles the module with this folder's tsconfig into `out/`, rewrites the
+`@/lib/...` requires that tsc leaves in the output to `./...` with sed, copies `check.js`
+into `out/` and runs it with node.
+
+Run it whenever `invoiceFields.ts`, `departments.ts` or `fieldChoices.ts` changes. The
+department matrix at the top of check.js is the contract, and with no rows from the
+Department fields screen it must still hold exactly. The assertions added on 2026-10-25 pin
+what that screen may change (delivery, PO number, property work, terms) and what it may not
+(number, date, amount, tax, freight, filing, due date, status), and that a section takes its
+department's invoice shape. It tests the matrix only: the edit form's save path is not
+covered here.

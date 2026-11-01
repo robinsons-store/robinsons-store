@@ -70,7 +70,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # Both scripts below come from the base branch, never from the pull request's own
+      # commits: the commit the pull request targets, or the default branch for a CI result
+      # or a run by hand. slack-lifecycle.test.mjs fails if this ref goes.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.repository.default_branch }}
 
       - name: Work out which request this is, and what to say
         id: what
