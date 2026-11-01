@@ -21,6 +21,14 @@ finish or a hung database, and the Ask route through its real POST handler (the 
 store wins over the body's, 429 when capped, and a logged issue is still reported). The
 hung-database case takes about 1.5 seconds on purpose.
 
+It also pins the client's own rules: 529 retried then answered, 529 three times gives up
+after three fetches, the request body never carries `temperature`, `top_p` or `top_k` and
+carries only the known keys, a deadline cuts the attempt and skips a retry that cannot
+finish, a 429's `retry-after` is waited out (or the call gives up at once when it does not
+fit), an HTML page with a 200 gives plain words with no parser text, and a 404 model error
+is kind `config` after one fetch. `sleep` and `now` are passed in, so no case waits for a
+real retry.
+
 ## The SQL, on a throwaway Postgres
 
 ```sh
