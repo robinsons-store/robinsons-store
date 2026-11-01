@@ -261,7 +261,7 @@ sequenceDiagram
     UI->>EX: image + session token
     EX->>DB: ai_call_begin (refused past the daily cap)
     EX->>AI: strict JSON contract
-    AI-->>EX: vendor, date, lines, confidence per line
+    AI-->>EX: vendor, number, date, printed totals, lines, confidence per line
     EX->>DB: ai_call_finish
     EX-->>UI: draft
   else Enter manually (phone order)
@@ -281,21 +281,30 @@ line, unless the store has used its daily AI allowance; a phone order is typed i
 never touches the AI or Storage. A person fixes or confirms every low-confidence line, then
 any original file is uploaded and the receiving event, its lines and an audit row are written.
 
-- Manual entry needs no file and skips the upload [R src/app/capture/page.tsx:193, 199-201].
+- Manual entry needs no file and skips the upload [R src/app/capture/page.tsx:233, 240-246].
   BUILT. The AI usage reserve and finish around the model call are in section 2
   [R src/lib/anthropic.ts:70, 152, 158].
 
 - The photo is downscaled before sending so a phone picture does not exceed the request body
-  limit; the stored file is the original. BUILT [R src/app/capture/page.tsx:114-122].
-- Save is blocked until any discrepancy and any amber line is acknowledged
-  [R src/app/capture/page.tsx:190-193]. The database refuses a line under 0.7 confidence
-  with a unit cost unless the event carries `low_confidence_ack`. BUILT
-  [R supabase/edit_delete.sql:41-61].
+  limit; the stored file is the original. BUILT [R src/app/capture/page.tsx:137-141].
+- Save is blocked until any discrepancy, any amber line and any mismatch between the lines and
+  the invoice's printed totals is acknowledged [R src/app/capture/page.tsx:233-236]. The
+  database refuses a line under 0.7 confidence with a unit cost unless the event carries
+  `low_confidence_ack`. BUILT [R supabase/edit_delete.sql:41-61]. The totals mismatch has no
+  database check of its own; its tick is stored on the same `low_confidence_ack`
+  [R src/app/capture/page.tsx:261].
+- The vendor the reader returns is matched to one on file in the department with case,
+  punctuation (an apostrophe or period joins, "O'Reilly" is "OReilly"), "&" and a trailing company suffix such as Inc, Ltd, Limited or Co ignored; two vendors that match the
+  same way match neither, so no order check runs against the wrong vendor. BUILT
+  [R src/lib/vendorMatch.ts:29-41] [R src/app/capture/page.tsx:215].
+- The invoice number goes at the front of the notes unless the notes already name it as the invoice:
+  the form has no box for it and `receiving_event` no column. BUILT
+  [R src/lib/captureLines.ts:39-45] [R src/app/capture/page.tsx:161].
 - Order of writes: file upload first, then `receiving_event`, then `receiving_line`, then
-  `activity_log` [R src/app/capture/page.tsx:199-238]. These are four separate requests from
+  `activity_log` [R src/app/capture/page.tsx:240-275]. These are four separate requests from
   the browser, not one transaction (see ARCH-07).
 - Capture writes no `invoice` row; invoices are entered on the vendor and money screens.
-  BUILT [R src/app/capture/page.tsx:205-238].
+  BUILT [R src/app/capture/page.tsx:232-295].
 
 ## 4. Money: how an invoice's status moves
 
@@ -424,7 +433,7 @@ The store-scoping rule. BUILT: every read filters by the active `store_id` and e
 stamps it; child tables scope through their parent [R .claude/skills/robinsons-store/SKILL.md:121].
 PARTIAL in the code: a few reads leave scoping to row-level security alone, for example the
 capture screen's list of people (`app_user`) and the shared tax rules
-[R src/app/capture/page.tsx:61, 77].
+[R src/app/capture/page.tsx:70, 86].
 At the database, 14 tables carry their own `store_id` policy: nine in section 3a
 [R supabase/auth_setup.sql:102-133] and the five that carry a dollar figure in section 3e,
 which adds the role fence [R supabase/auth_setup.sql:315-331]. `inventory_count_line`,
@@ -628,7 +637,7 @@ flowchart LR
   CC["callClaude<br/>the one door"]
   LOG[("ai_call log<br/>daily cap per store")]
   AN["Anthropic API, US<br/>claude-sonnet-5"]
-  CHK["Answer checks<br/>schema, stop reason, grounding"]
+  CHK["Answer checks<br/>schema, printed totals, stop reason, grounding"]
   H["Invoice capture: person confirms<br/>amber lines, I checked"]
   REC[("Receiving records")]
   P -- "photo or question, session" --> R
@@ -645,8 +654,9 @@ flowchart LR
 
 Plain flow: a route checks who is asking, reads store data where needed (Ask and reorder limit
 dollar data by role), and hands a fenced prompt to `callClaude`, which counts the call against
-the store's daily cap and then asks Anthropic. Checks include the invoice schema, the stop
-reason and, for Ask, vendor names against the store data and app guide. Invoice capture saves
+the store's daily cap and then asks Anthropic. Checks include the invoice schema, the invoice's
+lines added up against the totals printed on it, the stop reason and, for Ask, vendor names
+against the store data and app guide. Invoice capture saves
 receiving records after a person confirms; `/api/feedback-triage` automatically saves the
 screenshot description to `feedback_summary`. Ask and reorder answers are displayed, not saved.
 
@@ -658,13 +668,14 @@ What is in the AI side, layer by layer:
 | Model | `claude-sonnet-5`; `ANTHROPIC_MODEL` overrides; no temperature or other sampling setting is sent | BUILT | [R src/lib/anthropic.ts:11-12, 56-58] |
 | One door | Every call goes through `callClaude`: retries 429, 529 and 500, 502, 503, 504 twice with backoff, never retries a timeout or a 400, reads refusal and cut-off from `stop_reason` | BUILT | [R src/lib/anthropic.ts:53-54, 88-121, 137-142] |
 | Prompt | Store data and the question are fenced and marked as data, not instructions | BUILT | [R src/app/api/ask/route.ts:145, 170-175] |
-| Output contract | Invoice reader output is constrained to a JSON schema by the API | BUILT | [R src/app/api/extract/route.ts:43-67, 108] |
+| Output contract | Invoice reader output is constrained to a JSON schema by the API: vendor, invoice number, date, notes, the subtotal, HST and total as printed, and the lines | BUILT | [R src/app/api/extract/route.ts:48-76, 117] |
+| Totals check | No model involved: the lines (qty x unit cost) are added up and compared with the printed subtotal, or the printed total less the printed tax (HST at the rate only when no tax is printed; the total as is only on paper with no subtotal and no tax), within 5 cents. A mismatch is flagged, and so is any printed figure that is not a usable number unless the lines make the printed subtotal itself. Capture reruns the check on every edit and will not save until a person ticks "I checked the lines against the invoice total", stored on `low_confidence_ack`; the tick lapses when an edit changes what the lines add up to. Staff see that the lines disagree, never by how much. An invoice number carrying an amount is left blank, since it goes into the notes staff see | BUILT | [R src/lib/extractValidate.ts:96-129, 165-204] [R src/app/capture/page.tsx:199-200, 203-210, 236, 261, 464-494] |
 | Grounding | Checks vendor names the Ask answer mentions against the store data and app guide. Unsupported names withhold the answer; the question excuses them only if all occur in the question and the answer has no figures (no digits) | BUILT | [R src/lib/askGrounding.ts:256-290] [R src/app/api/ask/route.ts:185-196] |
-| Human in the loop | Invoice capture requires a person to confirm and save; the database refuses a line under 0.7 confidence with a cost unless a person acknowledged it. Screenshot descriptions save automatically to `feedback_summary`; Ask and reorder answers are displayed, not saved | BUILT | [R src/app/capture/page.tsx:183-229, 432-439] [R supabase/edit_delete.sql:41-61] [R src/app/api/feedback-triage/route.ts:85-91] [R src/app/ask/page.tsx:23-42] [R src/app/reorder/page.tsx:151-157] |
+| Human in the loop | Invoice capture requires a person to confirm and save; the database refuses a line under 0.7 confidence with a cost unless a person acknowledged it. Screenshot descriptions save automatically to `feedback_summary`; Ask and reorder answers are displayed, not saved | BUILT | [R src/app/capture/page.tsx:229-236, 261, 503] [R supabase/edit_delete.sql:41-61] [R src/app/api/feedback-triage/route.ts:85-91] [R src/app/ask/page.tsx:23-42] [R src/app/reorder/page.tsx:151-157] |
 | Cost | Daily cap per store, default 100 calls, roughly $10 on a runaway day; fails open so the receiving door is never blocked by the log | BUILT | [R src/lib/aiUsage.ts:8-15, 24-28] |
 | Logging | Metadata only (route, model, tokens, time, outcome), never the prompt, store data or answer | BUILT | [R src/lib/anthropic.ts:162-171] [R supabase/ai_call.sql:4-8] |
 | Failure words | Every failure has a plain sentence and a next step; capture always offers Enter manually | BUILT | [R src/lib/anthropic.ts:174-192] [R src/app/api/extract/route.ts:113-131] |
-| Evals | 24 made-up golden cases scored by fixed rules; never run against the model, so a model change has no regression gate yet | PARTIAL | [R docs/AGENTS.md] |
+| Evals | 25 made-up golden cases scored by fixed rules, including the invoice number, the printed totals and the totals check's verdict; never run against the model, so a model change has no regression gate yet | PARTIAL | [R docs/AGENTS.md] [R scripts/aievals-check/cases/extract.json] |
 | Data residency | The four routes send data to Anthropic in the US; what each sends is in section 7 and docs/PLATFORM.md | BUILT, recorded | Section 7 |
 | Retrieval | The whole store's data goes in the prompt; a vector index waits until the data outgrows one prompt | TARGET | Section 9 |
 
@@ -677,7 +688,7 @@ Risks named after the standards, and where each is handled:
 | Improper output handling | JSON schema, `plainText()` strip, grounding check |
 | Excessive agency | Invoice capture requires a person to confirm and save; screenshot descriptions save automatically to `feedback_summary`; Ask and reorder answers are displayed, not saved. The build agent opens draft pull requests; only a words-only tier A change may merge itself, and that is off until `AUTOMERGE_TIER_A` is set (section 6) |
 | Unbounded consumption | Daily cap per store |
-| Confabulation | Confidence per line, amber lines, the 0.7 database gate |
+| Confabulation | Confidence per line, amber lines, the 0.7 database gate; and, independent of the model's own confidence, the lines checked against the totals printed on the invoice |
 
 Gap against the multi-store rule: the Ask and reorder prompts and the alert email name the store
 and its town in code, so a second store's assistant would call itself Robinsons
@@ -860,3 +871,15 @@ Confirmed: the Slack intake configuration gate; the separate CI gates; promotion
 a person starts it; the recorded dev preview and pending automatic dev migrations. Sources:
 `.github/workflows/slack-autopilot.yml:105-121`, `.github/workflows/ci.yml:28-44`,
 `.github/workflows/promote.yml:24-25,84-113`, and `docs/ENVIRONMENTS.md:19-39,54-56,75`.
+
+**Basis, 2026-10-30 invoice totals check: 11 claims checked, 11 confirmed, 0 killed, 4 sources.**
+Sections 3 and 8 on branch capture-invoice-checks. Confirmed: every `[R]` added or re-pointed
+in those sections opened at its line (route schema, totals check, Capture gate, tick, card and
+vendor match, notes prefill, the confidence trigger); the totals check, vendor match and notes
+rule by `scripts/extractvalidate-check` (97 of 97, and failing under each of seven deliberate
+breaks of the code); the eight findings of an independent read-only review, each fixed and
+covered by a test; the 25 cases by `scripts/aievals-check` (124 of 124) and by
+`npm run eval:ai -- --offline` through the real route (24 of 24, the known gap still failing);
+no code path writes a saved line's confidence below 0.7 with a cost (grep of `src/`). Sources:
+this repository, local test runs, the offline eval, the review. Not verified: a live model run, and the
+screen in a browser.

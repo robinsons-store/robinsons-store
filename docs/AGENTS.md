@@ -20,7 +20,7 @@ current Claude models reject non-default sampling settings [R `src/app/api/extra
 
 | Agent | What it does for the store | Where | Guardrails | State |
 |---|---|---|---|---|
-| **Invoice reader** | Reads an invoice photo or PDF into vendor, date, line items and confidence per line | `/api/extract` [R `src/app/api/extract/route.ts:80`] | Signed-in member resolved first [R `:69`]; strict JSON contract; low-confidence dollar lines cannot save until a person fixes or confirms them [R `RUNBOOK.md:105-107`]; a refusal tells staff to enter it by hand [R `:124`] | BUILT |
+| **Invoice reader** | Reads an invoice photo or PDF into vendor, invoice number, date, the printed subtotal, HST and total, line items and confidence per line | `/api/extract` [R `src/app/api/extract/route.ts:78`] | Signed-in member resolved first [R `:82`]; strict JSON contract; low-confidence dollar lines cannot save until a person fixes or confirms them [R `RUNBOOK.md:105-107`]; lines that do not add up to the printed totals cannot save until a person ticks that they checked them, with no extra model call [R `src/lib/extractValidate.ts:96`]; a refusal tells staff to enter it by hand [R `:128`] | BUILT |
 | **Ask the store** | Answers questions from the store's own notes, vendors and invoices, with citations; also logs "log this issue: ..." straight into Suggestions | `/api/ask` [R `src/app/api/ask/route.ts:39`] | Dollar data withheld from roles that cannot see money [R `:36`, `:91`]; issue logging is deterministic, verbatim, attributed and only for signed-in members [R `:95-96`]; answer stripped to plain text [R `:166`] | BUILT |
 | **Reorder summary** | Turns the formula-based reorder list into a short plain-language summary | `/api/reorder` [R `src/app/api/reorder/route.ts:23`] | Money roles only once login is enforced [R `:33`]; plain text [R `:110`] | BUILT |
 | **Suggestion screenshot reader** | Describes a screenshot attached to an owner suggestion, so the developer digest carries it as text | `/api/feedback-triage` [R `src/app/api/feedback-triage/route.ts:30`] | Under 120 words, plain text, no dollar amounts, pay or personal details copied [R `:21-26`, `:82`]; runs as the caller and saves to `feedback_summary`, which opens only to lead, manager, owner and whoever attached the screenshot [R `:85-91`] [R `supabase/auth_setup.sql:675-710`] (ADR-005); best-effort, never blocks saving the suggestion [R `:14-19`] | BUILT |
@@ -46,7 +46,7 @@ builds and the capture screen still offers Enter manually.
 | **Typecheck stop hook** | Refuses to end a Claude Code turn while TypeScript is broken; fails open if it cannot run | `.claude/hooks/gate-typecheck.sh` [R `:2`], wired in `.claude/settings.json` | Claude Code sessions | BUILT |
 | **Skills** | `robinsons-store` (domain, invariants, playbooks, and the documentation and review standard in `references/standards.md`), `supabase` and `supabase-postgres-best-practices` (vendor guidance), `vercel-react-best-practices` (React and Next.js performance guidance, pinned in `skills-lock.json` [R skills-lock.json:16,20]) | `.claude/skills/` and `.agents/skills/`; `robinsons-store` lives only in `.claude/skills/` | Claude Code, Codex and other agents; precedence follows root AGENTS.md | BUILT |
 | **Jira autopilot** | The board-driven version of the Slack autopilot | `.github/workflows/jira-autopilot.yml` | Parked since 2026-08-12; tests still run in CI | SCAFFOLDED |
-| **Golden-case evals** | Sends 24 made-up invoices and questions through the real invoice reader and Ask routes and scores the answers by fixed rules, with a pass rate per case | `scripts/aievals-check`, run with `npm run eval:ai` [R `package.json:11`] | The developer's machine, on whatever `ANTHROPIC_API_KEY` is in `.env.local` or the shell; exits at once in CI [R `scripts/aievals-check/live.ts:55`]. Its scorer tests use no model and are a step in `.github/workflows/ci.yml` | PARTIAL (built and checked offline; not yet run against the model) |
+| **Golden-case evals** | Sends 25 made-up invoices and questions through the real invoice reader and Ask routes and scores the answers by fixed rules, with a pass rate per case | `scripts/aievals-check`, run with `npm run eval:ai` [R `package.json:11`] | The developer's machine, on whatever `ANTHROPIC_API_KEY` is in `.env.local` or the shell; exits at once in CI [R `scripts/aievals-check/live.ts:55`]. Its scorer tests use no model and are a step in `.github/workflows/ci.yml` | PARTIAL (built and checked offline; not yet run against the model) |
 
 **What the build agents can never do on their own:** merge money, access, database or
 automation changes (tier C), run `auth_setup.sql`, or promote to production; promotion is a
@@ -93,6 +93,12 @@ claims checked, 5 confirmed. Confirmed: the build job holds only `ANTHROPIC_API_
 read-only token, the Slack token only find and ship (workflow parsed, secrets listed per job);
 the reviewers and the classifier read the build's bundle before the pull request opens; every
 line reference in the six rows re-read. Source: this repository.
+The invoice reader row brought up to date, 2026-10-30, branch capture-invoice-checks: 4 claims
+checked, 4 confirmed. Confirmed: the reader returns the invoice number and printed totals, and
+lines that do not add up to them need a tick before saving (scripts/extractvalidate-check 91 of
+91); the golden cases are 25 (scripts/aievals-check 124 of 124); every line reference in the two
+rows re-read. Source: this repository.
+
 **Basis (skills row): 3 claims checked this session (2026-10-30), 3 confirmed, 0 killed,
 4 sources.** The React skill exists in both skill directories, its source is pinned in
 skills-lock.json, and precedence is defined in root AGENTS.md.

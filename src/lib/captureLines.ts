@@ -32,6 +32,18 @@ export function linesToSave(lines: LineItem[], showMoney: boolean, threshold: nu
   });
 }
 
+// The capture form has no invoice number box (receiving_event has no column for it), so the
+// number the reader found goes at the front of the notes, where the person sees it and can
+// change it. Left alone when the notes already name it as the invoice ("Invoice NB-20417",
+// "#NB-20417"); the same digits as another figure ("Net 30") do not count.
+export function notesWithInvoiceNumber(notes: string, invoiceNumber: string): string {
+  const n = invoiceNumber.trim();
+  if (!n) return notes;
+  const escaped = n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (new RegExp(`(invoice|inv|facture|no|#)\\W{0,3}${escaped}(?![a-z0-9])`, "i").test(notes)) return notes;
+  return notes ? `Invoice ${n}. ${notes}` : `Invoice ${n}`;
+}
+
 // The update for a cost typed later onto a saved line that has none (the feed's "Needs a cost"
 // list). Typing it is the same check as retyping it at capture, so confidence goes to 1 and the
 // database confidence trigger passes without the event's acknowledgement. Takes "12.50",

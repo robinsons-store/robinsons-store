@@ -32,7 +32,16 @@ export type ExpectedLine = {
 export type ExtractExpect = {
   // "" means the field must come back blank: nothing invented.
   vendor?: string;
+  // Letters and digits only, after any leading label: "Invoice no. NB-20417" is "NB-20417".
+  invoice_number?: string;
   invoice_date?: string;
+  // The figures printed under the table, copied rather than worked out from the lines. null
+  // means not printed. Within costTolerance.
+  printed_subtotal?: number | null;
+  printed_hst?: number | null;
+  printed_total?: number | null;
+  // What the totals check in src/lib/extractValidate.ts must conclude.
+  totals_mismatch?: boolean;
   lines?: ExpectedLine[];
   // Default true when lines are given: no extra lines, no missing ones.
   exactLineCount?: boolean;
@@ -59,6 +68,16 @@ export function vendorKey(s: unknown): string {
   return tokens(typeof s === "string" ? s.replace(/&/g, " and ") : "")
     .filter((t) => !SUFFIXES.has(t))
     .join(" ");
+}
+
+const NUMBER_LABELS = new Set(["invoice", "facture", "inv", "no", "nr", "number", "num", "n"]);
+
+// "NB-20417", "nb 20417" and "Invoice No. NB-20417" are the same invoice number; so are
+// "55-0418" and "Facture no 55-0418".
+export function invoiceKey(s: unknown): string {
+  const t = tokens(s);
+  while (t.length > 1 && NUMBER_LABELS.has(t[0])) t.shift();
+  return t.join("");
 }
 
 // "sirop|syrup" accepts either word, for a reader that may or may not translate. A plural
@@ -88,9 +107,23 @@ export function scoreExtract(expect: ExtractExpect, out: RouteOutput): Score {
     const pass = vendorKey(body.vendor) === vendorKey(expect.vendor);
     checks.push({ name: "vendor", pass, detail: pass ? undefined : `got ${show(body.vendor)}, expected ${show(expect.vendor)}` });
   }
+  if (expect.invoice_number !== undefined) {
+    const pass = invoiceKey(body.invoice_number) === invoiceKey(expect.invoice_number);
+    checks.push({ name: "invoice_number", pass, detail: pass ? undefined : `got ${show(body.invoice_number)}, expected ${show(expect.invoice_number)}` });
+  }
   if (expect.invoice_date !== undefined) {
     const pass = body.invoice_date === expect.invoice_date;
     checks.push({ name: "invoice_date", pass, detail: pass ? undefined : `got ${show(body.invoice_date)}, expected ${show(expect.invoice_date)}` });
+  }
+  for (const field of ["printed_subtotal", "printed_hst", "printed_total"] as const) {
+    const want = expect[field];
+    if (want === undefined) continue;
+    const pass = sameAmount(body[field], want, tol);
+    checks.push({ name: field, pass, detail: pass ? undefined : `got ${show(body[field])}, expected ${show(want)}` });
+  }
+  if (expect.totals_mismatch !== undefined) {
+    const pass = body.totals_mismatch === expect.totals_mismatch;
+    checks.push({ name: "totals_mismatch", pass, detail: pass ? undefined : `got ${show(body.totals_mismatch)}, expected ${expect.totals_mismatch}` });
   }
 
   const actual: any[] = body.line_items;

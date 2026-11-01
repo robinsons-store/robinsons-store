@@ -2,7 +2,7 @@
 const fs = require("fs");
 const path = require("path");
 const S = require("./score.js");
-const { renderPdf } = require("./pdf.js");
+const { renderPdf, printedTotals } = require("./pdf.js");
 
 const HERE = path.join(__dirname, "..");
 const read = (p) => JSON.parse(fs.readFileSync(path.join(HERE, p), "utf8"));
@@ -68,6 +68,21 @@ for (const c of extract) {
 }
 t("every expected line names one printed row and agrees with it", mismatches.length === 0, mismatches.join("; "));
 
+// Expected printed totals are the figures the invoice prints, worked out by the renderer, and
+// null exactly where the invoice prints no such row.
+const totalsOff = [];
+for (const c of extract) {
+  const p = printedTotals(c.document);
+  for (const [field, key] of [["printed_subtotal", "subtotal"], ["printed_hst", "hst"], ["printed_total", "total"]]) {
+    const want = c.expect[field];
+    if (want === undefined) continue;
+    const ok = want === null ? p[key] === null : p[key] !== null && Math.abs(want - p[key]) < 1e-9;
+    if (!ok) totalsOff.push(`${c.id} ${field} ${want}, printed ${p[key]}`);
+  }
+}
+t("every expected printed total is what the invoice prints", totalsOff.length === 0, totalsOff.join("; "));
+t("every case says what the totals check concludes", extract.every((c) => typeof c.expect.totals_mismatch === "boolean"));
+
 // ---------- the invoices render ----------
 
 for (const c of extract) {
@@ -87,6 +102,9 @@ const hand = renderPdf(extract.find((c) => c.id === "extract-retail-notes").docu
 t("margin notes are drawn in the handwriting font", (hand.match(/\/F3 13 Tf/g) || []).length === 2);
 const fr = renderPdf(extract.find((c) => c.id === "extract-french").document).toString("latin1");
 t("French amounts print with a decimal comma", fr.includes("9,85 $") && fr.includes("Tourtière"));
+const pageTwo = extract.find((c) => c.id === "extract-page-two").document;
+const p2 = renderPdf(pageTwo).toString("latin1");
+t("the carried-forward balance prints and counts in the subtotal", p2.includes("Carried forward from page 1") && p2.includes("312.40") && p2.includes("528.70") && printedTotals(pageTwo).subtotal === 528.7);
 
 // ---------- the scorers, against the samples ----------
 
@@ -116,6 +134,9 @@ for (const kind of ["extract", "ask"]) {
 
 t("vendor suffixes and ampersands fold", S.vendorKey("Bancroft Feed & Seed Ltd.") === S.vendorKey("BANCROFT FEED AND SEED"));
 t("a blank vendor does not match a name", S.vendorKey("") !== S.vendorKey("Unknown"));
+t("invoice number labels fold", S.invoiceKey("Invoice No. NB-20417") === S.invoiceKey("nb 20417") && S.invoiceKey("Facture no 55-0418") === S.invoiceKey("55-0418"));
+t("a number missing its prefix is a different number", S.invoiceKey("20417") !== S.invoiceKey("NB-20417"));
+t("a blank invoice number does not match one", S.invoiceKey("") !== S.invoiceKey("Till 2"));
 t("thousands separators fold", S.normalizeAnswer("$1,186.50 and 4,011.50") === "$1186.50 and 4011.50");
 t("unknown phrase list throws", (() => { try { S.expandPhrases({ mustInclude: ["@NOPE"] }, {}); return false; } catch { return true; } })());
 t("every @phrase in ask.json resolves", (() => { try { ask.forEach((c) => S.expandPhrases(c.expect, askFile.phrases)); return true; } catch { return false; } })());

@@ -17,8 +17,12 @@ Read printed text and any handwritten notes or prices written in the margins.
 Return ONLY a JSON object, no prose and no code fences, in exactly this shape:
 {
   "vendor": string,
+  "invoice_number": string,
   "invoice_date": string in YYYY-MM-DD or empty string if unknown,
   "notes": string,
+  "printed_subtotal": number or null,
+  "printed_hst": number or null,
+  "printed_total": number or null,
   "line_items": [
     {
       "description": string,
@@ -29,7 +33,8 @@ Return ONLY a JSON object, no prose and no code fences, in exactly this shape:
     }
   ]
 }
-Rules: amounts are in CAD as plain numbers with no currency symbol. retail_price_note is the retail price written by hand next to a line, or null if none. confidence is between 0 and 1; set it low on any field you are unsure about. If a value is missing use 0 for numbers and an empty string for text.`;
+Rules: amounts are in CAD as plain numbers with no currency symbol. retail_price_note is the retail price written by hand next to a line, or null if none. confidence is between 0 and 1; set it low on any field you are unsure about. If a line value is missing use 0 for numbers and an empty string for text; the printed_ fields below follow their own rule.
+invoice_number is the invoice or receipt number exactly as printed, or an empty string if there is none. printed_subtotal, printed_hst and printed_total are the subtotal before tax, the HST or other sales tax, and the final total or amount due, copied exactly as printed on the document. Never work them out from the lines: use null for any of the three that is not printed. Subtotal, tax and total rows go in these three fields and never in line_items.`;
 
 // The same contract as the prompt, enforced by the API instead of asked for politely.
 // Structured outputs constrain the response to this schema, so "the model wrapped it in a
@@ -44,8 +49,12 @@ const OUTPUT_SCHEMA = {
   type: "object",
   properties: {
     vendor: { type: "string" },
+    invoice_number: { type: "string" },
     invoice_date: { type: "string" },
     notes: { type: "string" },
+    printed_subtotal: { anyOf: [{ type: "number" }, { type: "null" }] },
+    printed_hst: { anyOf: [{ type: "number" }, { type: "null" }] },
+    printed_total: { anyOf: [{ type: "number" }, { type: "null" }] },
     line_items: {
       type: "array",
       items: {
@@ -62,7 +71,7 @@ const OUTPUT_SCHEMA = {
       }
     }
   },
-  required: ["vendor", "invoice_date", "notes", "line_items"],
+  required: ["vendor", "invoice_number", "invoice_date", "notes", "printed_subtotal", "printed_hst", "printed_total", "line_items"],
   additionalProperties: false
 } as const;
 

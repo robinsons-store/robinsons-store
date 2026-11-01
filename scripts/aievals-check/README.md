@@ -2,7 +2,7 @@
 
 Status: PROPOSED, 2026-10-24. Owner: the developer. Approver: Ravi Kiran.
 
-**24 fixed cases for the two AI routes, scored by rules rather than judgement: 11 invoices for
+**25 fixed cases for the two AI routes, scored by rules rather than judgement: 12 invoices for
 `/api/extract` and 13 questions for `/api/ask`.** The scorer tests run with no model; the live
 run (`npm run eval:ai`) spends the API key and has not been run yet. Everything in `cases/` and
 `samples/` is made up. Never paste a real invoice, vendor or store record into them.
@@ -17,14 +17,14 @@ This calls the real route handlers, so the prompts, the output schema, the value
 `src/lib/extractValidate.ts` and the Ask context are exactly what is deployed, and every model
 call goes through `src/lib/anthropic.ts`. It reads `ANTHROPIC_API_KEY` (and `ANTHROPIC_MODEL`,
 if set) from the shell or `.env.local`, the same file `npm run dev` uses. By default each case
-runs 3 times: 72 model calls. It prints a pass rate per case and the checks that failed, and
+runs 3 times: 75 model calls. It prints a pass rate per case and the checks that failed, and
 saves every answer under `out/live/` with the invoices it sent.
 
 Options go after `--`, with a space before each value:
 
 | Option | Effect |
 |---|---|
-| `--runs N` | Runs per case (default 3). `--runs 1` is 24 calls. |
+| `--runs N` | Runs per case (default 3). `--runs 1` is 25 calls. |
 | `--only TEXT` | Only cases whose id contains TEXT, for example `--only ask-staff`. |
 | `--offline` | No key, no network, no cost: the routes answer from the hand-written samples. Checks that the routes still load and the prompts still build. |
 
@@ -47,7 +47,12 @@ Extract (`scoreExtract`): vendor (company suffixes and `&` vs `and` ignored), in
 exactly, each expected line found by its key words, quantity exactly, unit cost and
 handwritten retail price within one cent, the exact line count, no Subtotal, HST or Total row
 read as a purchase, and for a returned item that the line lands in the capture screen's amber
-band (confidence below 0.7, pinned to `src/app/capture/page.tsx`).
+band (confidence below 0.7, pinned to `src/app/capture/page.tsx`). Also the invoice number
+(letters and digits only, a leading "Invoice no." ignored), the subtotal, HST and total as
+printed within one cent (null where the paper prints none), and the verdict of the totals
+check in `src/lib/extractValidate.ts`. The CI check confirms each expected printed figure is
+what the rendered invoice prints; `scripts/extractvalidate-check` confirms each sample's
+verdict is what that code computes from the sample's own lines.
 
 Ask (`scoreAsk`): facts that must appear (dollar amounts compared as numbers, so `$1,186.50`
 and `1186.50` both count), facts and patterns that must not, no em dash, no markdown, and no
@@ -109,3 +114,7 @@ encode (money hidden from staff, store scoping, plain text, no em dashes):
 **Basis: 8 claims checked this session (2026-10-24), 8 confirmed, 0 killed, 1 source.** The
 four `[R]` lines were opened at the named lines; the argument, CI, no-key, offline and
 known-gap behaviour was run. Source: this repository.
+
+Updated 2026-10-30 on branch capture-invoice-checks: 3 claims checked, 3 confirmed. The
+case count (25, 12 invoices) and call counts follow from cases/; the CI check passes 124 of
+124 and the offline run 24 of 24 [V-run, both, 2026-10-30]; the four `[R]` lines above re-read.

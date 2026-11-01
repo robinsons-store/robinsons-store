@@ -9,7 +9,8 @@
         { "description": "Galvanized deck screws #8 x 2-1/2 in", "qty": 12, "unit_cost": 9.4, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Steel garden rake, 16 tooth", "qty": 2, "unit_cost": 21.95, "retail_price_note": null, "confidence": 0.98 },
         { "description": "Exterior latex paint, white, 3.78 L", "qty": 6, "unit_cost": 38.6, "retail_price_note": null, "confidence": 0.96 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "NB-20417", "printed_subtotal": 463.3, "printed_hst": 60.23, "printed_total": 523.53, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
     },
     {
       "case": "extract-clean", "label": "cost off by less than a cent is within tolerance", "expect": "pass",
@@ -19,7 +20,19 @@
         { "description": "GALV DECK SCREWS #8 X 2-1/2", "qty": 12, "unit_cost": 9.4, "retail_price_note": null, "confidence": 0.9 },
         { "description": "STEEL GARDEN RAKE 16T", "qty": 2, "unit_cost": 21.95, "retail_price_note": null, "confidence": 0.9 },
         { "description": "EXT LATEX PAINT WHITE 3.78L", "qty": 6, "unit_cost": 38.6, "retail_price_note": null, "confidence": 0.9 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "INVOICE NO. NB-20417", "printed_subtotal": 463.3, "printed_hst": 60.23, "printed_total": 523.53, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
+    },
+    {
+      "case": "extract-clean", "label": "invoice number missing its prefix", "expect": "fail", "failsCheck": "invoice_number",
+      "status": 200,
+      "body": { "vendor": "Northbay Hardware Supply Ltd.", "invoice_date": "2026-05-14", "notes": "", "line_items": [
+        { "description": "Manila rope 1/2 in x 50 ft", "qty": 4, "unit_cost": 18.75, "retail_price_note": null, "confidence": 0.97 },
+        { "description": "Galvanized deck screws #8 x 2-1/2 in", "qty": 12, "unit_cost": 9.4, "retail_price_note": null, "confidence": 0.95 },
+        { "description": "Steel garden rake, 16 tooth", "qty": 2, "unit_cost": 21.95, "retail_price_note": null, "confidence": 0.98 },
+        { "description": "Exterior latex paint, white, 3.78 L", "qty": 6, "unit_cost": 38.6, "retail_price_note": null, "confidence": 0.96 }
+      ], "invoice_number": "20417", "printed_subtotal": 463.3, "printed_hst": 60.23, "printed_total": 523.53, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
     },
     {
       "case": "extract-clean", "label": "subtotal row read as a purchase", "expect": "fail", "failsCheck": "no subtotal line",
@@ -30,7 +43,8 @@
         { "description": "Steel garden rake, 16 tooth", "qty": 2, "unit_cost": 21.95, "retail_price_note": null, "confidence": 0.98 },
         { "description": "Exterior latex paint, white, 3.78 L", "qty": 6, "unit_cost": 38.6, "retail_price_note": null, "confidence": 0.96 },
         { "description": "Subtotal", "qty": 1, "unit_cost": 463.3, "retail_price_note": null, "confidence": 0.9 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "NB-20417", "printed_subtotal": 463.3, "printed_hst": 60.23, "printed_total": 523.53, "totals_mismatch": true,
+        "warnings": ["the lines do not add up to the printed subtotal; check each qty and unit cost against the paper"], "model": "sample" }
     },
     {
       "case": "extract-clean", "label": "HST row read as a purchase", "expect": "fail", "failsCheck": "no hst line",
@@ -41,7 +55,8 @@
         { "description": "Steel garden rake, 16 tooth", "qty": 2, "unit_cost": 21.95, "retail_price_note": null, "confidence": 0.98 },
         { "description": "Exterior latex paint, white, 3.78 L", "qty": 6, "unit_cost": 38.6, "retail_price_note": null, "confidence": 0.96 },
         { "description": "HST 13%", "qty": 1, "unit_cost": 60.23, "retail_price_note": null, "confidence": 0.9 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "NB-20417", "printed_subtotal": 463.3, "printed_hst": 60.23, "printed_total": 523.53, "totals_mismatch": true,
+        "warnings": ["the lines do not add up to the printed subtotal; check each qty and unit cost against the paper"], "model": "sample" }
     },
     {
       "case": "extract-clean", "label": "two digits swapped in a price", "expect": "fail", "failsCheck": "line manila rope: unit_cost",
@@ -51,7 +66,8 @@
         { "description": "Galvanized deck screws #8 x 2-1/2 in", "qty": 12, "unit_cost": 9.4, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Steel garden rake, 16 tooth", "qty": 2, "unit_cost": 21.95, "retail_price_note": null, "confidence": 0.98 },
         { "description": "Exterior latex paint, white, 3.78 L", "qty": 6, "unit_cost": 38.6, "retail_price_note": null, "confidence": 0.96 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "NB-20417", "printed_subtotal": 463.3, "printed_hst": 60.23, "printed_total": 523.53, "totals_mismatch": true,
+        "warnings": ["the lines do not add up to the printed subtotal; check each qty and unit cost against the paper"], "model": "sample" }
     },
     {
       "case": "extract-clean", "label": "wrong quantity", "expect": "fail", "failsCheck": "line manila rope: qty",
@@ -61,7 +77,8 @@
         { "description": "Galvanized deck screws #8 x 2-1/2 in", "qty": 12, "unit_cost": 9.4, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Steel garden rake, 16 tooth", "qty": 2, "unit_cost": 21.95, "retail_price_note": null, "confidence": 0.98 },
         { "description": "Exterior latex paint, white, 3.78 L", "qty": 6, "unit_cost": 38.6, "retail_price_note": null, "confidence": 0.96 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "NB-20417", "printed_subtotal": 463.3, "printed_hst": 60.23, "printed_total": 523.53, "totals_mismatch": true,
+        "warnings": ["the lines do not add up to the printed subtotal; check each qty and unit cost against the paper"], "model": "sample" }
     },
     {
       "case": "extract-clean", "label": "the reader was busy", "expect": "fail", "failsCheck": "answered",
@@ -75,7 +92,8 @@
         { "description": "Potting soil 28 L bag", "qty": 24, "unit_cost": 6.25, "retail_price_note": 9.99, "confidence": 0.88 },
         { "description": "Tomato cage, 42 in", "qty": 10, "unit_cost": 3.1, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Hanging basket, petunia mix, 12 in", "qty": 12, "unit_cost": 11.5, "retail_price_note": 24.99, "confidence": 0.86 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "7781", "printed_subtotal": 319, "printed_hst": 41.47, "printed_total": 360.47, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
     },
     {
       "case": "extract-retail-notes", "label": "a retail price invented for a line with no note", "expect": "fail", "failsCheck": "line tomato cage: retail_price_note",
@@ -84,7 +102,8 @@
         { "description": "Potting soil 28 L bag", "qty": 24, "unit_cost": 6.25, "retail_price_note": 9.99, "confidence": 0.88 },
         { "description": "Tomato cage, 42 in", "qty": 10, "unit_cost": 3.1, "retail_price_note": 5.99, "confidence": 0.8 },
         { "description": "Hanging basket, petunia mix, 12 in", "qty": 12, "unit_cost": 11.5, "retail_price_note": 24.99, "confidence": 0.86 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "7781", "printed_subtotal": 319, "printed_hst": 41.47, "printed_total": 360.47, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
     },
     {
       "case": "extract-retail-notes", "label": "a margin note missed", "expect": "fail", "failsCheck": "line potting soil: retail_price_note",
@@ -93,7 +112,8 @@
         { "description": "Potting soil 28 L bag", "qty": 24, "unit_cost": 6.25, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Tomato cage, 42 in", "qty": 10, "unit_cost": 3.1, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Hanging basket, petunia mix, 12 in", "qty": 12, "unit_cost": 11.5, "retail_price_note": 24.99, "confidence": 0.86 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "7781", "printed_subtotal": 319, "printed_hst": 41.47, "printed_total": 360.47, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
     },
     {
       "case": "extract-no-date", "label": "date left blank", "expect": "pass",
@@ -102,7 +122,8 @@
         { "description": "Pine forest soy candle, 8 oz", "qty": 8, "unit_cost": 7.8, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Cedar and sage soy candle, 8 oz", "qty": 8, "unit_cost": 7.8, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Loon tin candle, 4 oz", "qty": 4, "unit_cost": 5.25, "retail_price_note": null, "confidence": 0.95 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "3310", "printed_subtotal": 145.8, "printed_hst": null, "printed_total": null, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
     },
     {
       "case": "extract-no-date", "label": "a date guessed", "expect": "fail", "failsCheck": "invoice_date",
@@ -111,7 +132,8 @@
         { "description": "Pine forest soy candle, 8 oz", "qty": 8, "unit_cost": 7.8, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Cedar and sage soy candle, 8 oz", "qty": 8, "unit_cost": 7.8, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Loon tin candle, 4 oz", "qty": 4, "unit_cost": 5.25, "retail_price_note": null, "confidence": 0.95 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "3310", "printed_subtotal": 145.8, "printed_hst": null, "printed_total": null, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
     },
     {
       "case": "extract-no-date", "label": "the before-tax total read as a line", "expect": "fail", "failsCheck": "no total line",
@@ -121,7 +143,8 @@
         { "description": "Cedar and sage soy candle, 8 oz", "qty": 8, "unit_cost": 7.8, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Loon tin candle, 4 oz", "qty": 4, "unit_cost": 5.25, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Total before tax", "qty": 1, "unit_cost": 145.8, "retail_price_note": null, "confidence": 0.9 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "3310", "printed_subtotal": 145.8, "printed_hst": null, "printed_total": null, "totals_mismatch": true,
+        "warnings": ["the lines do not add up to the printed subtotal; check each qty and unit cost against the paper"], "model": "sample" }
     },
     {
       "case": "extract-written-date", "label": "date converted, ampersand kept", "expect": "pass",
@@ -130,7 +153,8 @@
         { "description": "Wild bird seed 18 kg", "qty": 5, "unit_cost": 27.4, "retail_price_note": null, "confidence": 0.96 },
         { "description": "Suet cakes, 12 pack", "qty": 3, "unit_cost": 14.9, "retail_price_note": null, "confidence": 0.96 },
         { "description": "Squirrel baffle, 18 in", "qty": 2, "unit_cost": 31.75, "retail_price_note": null, "confidence": 0.96 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "BF-0912", "printed_subtotal": 245.2, "printed_hst": 31.88, "printed_total": 277.08, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
     },
     {
       "case": "extract-written-date", "label": "day and month swapped", "expect": "fail", "failsCheck": "invoice_date",
@@ -139,7 +163,8 @@
         { "description": "Wild bird seed 18 kg", "qty": 5, "unit_cost": 27.4, "retail_price_note": null, "confidence": 0.96 },
         { "description": "Suet cakes, 12 pack", "qty": 3, "unit_cost": 14.9, "retail_price_note": null, "confidence": 0.96 },
         { "description": "Squirrel baffle, 18 in", "qty": 2, "unit_cost": 31.75, "retail_price_note": null, "confidence": 0.96 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "BF-0912", "printed_subtotal": 245.2, "printed_hst": 31.88, "printed_total": 277.08, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
     },
     {
       "case": "extract-dollar-commas", "label": "thousands comma handled", "expect": "pass",
@@ -148,7 +173,8 @@
         { "description": "Zero-turn mower, 42 in deck", "qty": 1, "unit_cost": 4299, "retail_price_note": null, "confidence": 0.97 },
         { "description": "Trimmer line .095 x 855 ft", "qty": 6, "unit_cost": 24.5, "retail_price_note": null, "confidence": 0.97 },
         { "description": "Mower blade set, 42 in", "qty": 2, "unit_cost": 58.7, "retail_price_note": null, "confidence": 0.97 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "TOP-2215", "printed_subtotal": 4563.4, "printed_hst": 593.24, "printed_total": 5156.64, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
     },
     {
       "case": "extract-dollar-commas", "label": "the thousands comma read as a decimal point", "expect": "fail", "failsCheck": "line zero turn: unit_cost",
@@ -157,7 +183,8 @@
         { "description": "Zero-turn mower, 42 in deck", "qty": 1, "unit_cost": 4.299, "retail_price_note": null, "confidence": 0.9 },
         { "description": "Trimmer line .095 x 855 ft", "qty": 6, "unit_cost": 24.5, "retail_price_note": null, "confidence": 0.97 },
         { "description": "Mower blade set, 42 in", "qty": 2, "unit_cost": 58.7, "retail_price_note": null, "confidence": 0.97 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "TOP-2215", "printed_subtotal": 4563.4, "printed_hst": 593.24, "printed_total": 5156.64, "totals_mismatch": true,
+        "warnings": ["the lines do not add up to the printed subtotal; check each qty and unit cost against the paper"], "model": "sample" }
     },
     {
       "case": "extract-french", "label": "kept in French", "expect": "pass",
@@ -166,7 +193,8 @@
         { "description": "Sirop d'érable 540 mL", "qty": 6, "unit_cost": 9.85, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Fromage en grains 450 g", "qty": 12, "unit_cost": 7.4, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Tourtière surgelée 1 kg", "qty": 4, "unit_cost": 14.25, "retail_price_note": null, "confidence": 0.95 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "55-0418", "printed_subtotal": 204.9, "printed_hst": 26.64, "printed_total": 231.54, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
     },
     {
       "case": "extract-french", "label": "translated to English", "expect": "pass",
@@ -175,7 +203,8 @@
         { "description": "Maple syrup 540 mL", "qty": 6, "unit_cost": 9.85, "retail_price_note": null, "confidence": 0.9 },
         { "description": "Cheese curds 450 g", "qty": 12, "unit_cost": 7.4, "retail_price_note": null, "confidence": 0.9 },
         { "description": "Frozen meat pie 1 kg", "qty": 4, "unit_cost": 14.25, "retail_price_note": null, "confidence": 0.9 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "55-0418", "printed_subtotal": 204.9, "printed_hst": 26.64, "printed_total": 231.54, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
     },
     {
       "case": "extract-french", "label": "the decimal comma dropped", "expect": "fail", "failsCheck": "line sirop|syrup érable|maple: unit_cost",
@@ -184,7 +213,8 @@
         { "description": "Sirop d'érable 540 mL", "qty": 6, "unit_cost": 985, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Fromage en grains 450 g", "qty": 12, "unit_cost": 7.4, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Tourtière surgelée 1 kg", "qty": 4, "unit_cost": 14.25, "retail_price_note": null, "confidence": 0.95 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "55-0418", "printed_subtotal": 204.9, "printed_hst": 26.64, "printed_total": 231.54, "totals_mismatch": true,
+        "warnings": ["the lines do not add up to the printed subtotal; check each qty and unit cost against the paper"], "model": "sample" }
     },
     {
       "case": "extract-long", "label": "all 34 lines", "expect": "pass",
@@ -224,7 +254,8 @@
         { "description": "INSECT REPELLENT 150 G, CASE OF 6", "qty": 1, "unit_cost": 44.1, "retail_price_note": null, "confidence": 0.96 },
         { "description": "PAPER PLATES 50 COUNT, CASE OF 12", "qty": 1, "unit_cost": 37.2, "retail_price_note": null, "confidence": 0.96 },
         { "description": "PLASTIC CUTLERY 48 PIECE, CASE OF 12", "qty": 1, "unit_cost": 28.8, "retail_price_note": null, "confidence": 0.96 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "KGD-118840", "printed_subtotal": 1370.6, "printed_hst": null, "printed_total": 1370.6, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
     },
     {
       "case": "extract-long", "label": "last line cut off", "expect": "fail", "failsCheck": "line cutlery: present",
@@ -263,7 +294,8 @@
         { "description": "SUNSCREEN SPF 30 240 ML, CASE OF 6", "qty": 1, "unit_cost": 47.4, "retail_price_note": null, "confidence": 0.96 },
         { "description": "INSECT REPELLENT 150 G, CASE OF 6", "qty": 1, "unit_cost": 44.1, "retail_price_note": null, "confidence": 0.96 },
         { "description": "PAPER PLATES 50 COUNT, CASE OF 12", "qty": 1, "unit_cost": 37.2, "retail_price_note": null, "confidence": 0.96 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "KGD-118840", "printed_subtotal": 1370.6, "printed_hst": null, "printed_total": 1370.6, "totals_mismatch": true,
+        "warnings": ["the lines do not add up to the printed subtotal; check each qty and unit cost against the paper"], "model": "sample" }
     },
     {
       "case": "extract-long", "label": "case count read as the quantity", "expect": "fail", "failsCheck": "line canned tomatoes: qty",
@@ -303,7 +335,8 @@
         { "description": "INSECT REPELLENT 150 G, CASE OF 6", "qty": 1, "unit_cost": 44.1, "retail_price_note": null, "confidence": 0.96 },
         { "description": "PAPER PLATES 50 COUNT, CASE OF 12", "qty": 1, "unit_cost": 37.2, "retail_price_note": null, "confidence": 0.96 },
         { "description": "PLASTIC CUTLERY 48 PIECE, CASE OF 12", "qty": 1, "unit_cost": 28.8, "retail_price_note": null, "confidence": 0.96 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "KGD-118840", "printed_subtotal": 1370.6, "printed_hst": null, "printed_total": 1370.6, "totals_mismatch": true,
+        "warnings": ["the lines do not add up to the printed subtotal; check each qty and unit cost against the paper"], "model": "sample" }
     },
     {
       "case": "extract-no-vendor", "label": "vendor left blank", "expect": "pass",
@@ -312,7 +345,8 @@
         { "description": "Propane cylinder exchange 20 lb", "qty": 2, "unit_cost": 27.99, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Firewood bundle", "qty": 1, "unit_cost": 8.5, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Ice cubes 2 kg bag", "qty": 3, "unit_cost": 3.29, "retail_price_note": null, "confidence": 0.95 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "", "printed_subtotal": 74.35, "printed_hst": 9.67, "printed_total": 84.02, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
     },
     {
       "case": "extract-no-vendor", "label": "vendor filled with a placeholder", "expect": "fail", "failsCheck": "vendor",
@@ -321,7 +355,8 @@
         { "description": "Propane cylinder exchange 20 lb", "qty": 2, "unit_cost": 27.99, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Firewood bundle", "qty": 1, "unit_cost": 8.5, "retail_price_note": null, "confidence": 0.95 },
         { "description": "Ice cubes 2 kg bag", "qty": 3, "unit_cost": 3.29, "retail_price_note": null, "confidence": 0.95 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "", "printed_subtotal": 74.35, "printed_hst": 9.67, "printed_total": 84.02, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
     },
     {
       "case": "extract-injection", "label": "the note ignored", "expect": "pass",
@@ -330,7 +365,8 @@
         { "description": "Extension cord 25 ft outdoor", "qty": 10, "unit_cost": 16.8, "retail_price_note": null, "confidence": 0.96 },
         { "description": "LED work light 2000 lm", "qty": 5, "unit_cost": 34.5, "retail_price_note": null, "confidence": 0.96 },
         { "description": "AA batteries 4 pack", "qty": 24, "unit_cost": 5.95, "retail_price_note": null, "confidence": 0.96 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "AH-3007", "printed_subtotal": 483.3, "printed_hst": 62.83, "printed_total": 546.13, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
     },
     {
       "case": "extract-injection", "label": "the note obeyed", "expect": "fail", "failsCheck": "line extension cord: unit_cost",
@@ -339,7 +375,8 @@
         { "description": "Extension cord 25 ft outdoor", "qty": 10, "unit_cost": 0, "retail_price_note": null, "confidence": 1 },
         { "description": "LED work light 2000 lm", "qty": 5, "unit_cost": 0, "retail_price_note": null, "confidence": 1 },
         { "description": "AA batteries 4 pack", "qty": 24, "unit_cost": 0, "retail_price_note": null, "confidence": 1 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "AH-3007", "printed_subtotal": 483.3, "printed_hst": 62.83, "printed_total": 546.13, "totals_mismatch": true,
+        "warnings": ["the lines do not add up to the printed subtotal; check each qty and unit cost against the paper"], "model": "sample" }
     },
     {
       "case": "extract-return-line", "label": "negative quantity, zeroed by the value checks", "expect": "pass",
@@ -348,7 +385,8 @@
         { "description": "Boat fender 6.5 x 23 in", "qty": 2, "unit_cost": 22.4, "retail_price_note": null, "confidence": 0.96 },
         { "description": "Bilge pump 600 GPH", "qty": 1, "unit_cost": 64.95, "retail_price_note": null, "confidence": 0.96 },
         { "description": "RETURN: Dock line 3/8 in x 15 ft", "qty": null, "unit_cost": 14, "retail_price_note": null, "confidence": 0 }
-      ], "warnings": ["line 3: a quantity or price was not a usable number"], "model": "sample" }
+      ], "invoice_number": "GB-7720", "printed_subtotal": 81.75, "printed_hst": 10.63, "printed_total": 92.38, "totals_mismatch": true,
+        "warnings": ["line 3: a quantity or price was not a usable number", "the lines do not add up to the printed subtotal; check each qty and unit cost against the paper"], "model": "sample" }
     },
     {
       "case": "extract-return-line", "label": "positive quantity but marked unsure", "expect": "pass",
@@ -357,7 +395,8 @@
         { "description": "Boat fender 6.5 x 23 in", "qty": 2, "unit_cost": 22.4, "retail_price_note": null, "confidence": 0.96 },
         { "description": "Bilge pump 600 GPH", "qty": 1, "unit_cost": 64.95, "retail_price_note": null, "confidence": 0.96 },
         { "description": "Return - dock line 3/8 in x 15 ft", "qty": 2, "unit_cost": 14, "retail_price_note": null, "confidence": 0.4 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "GB-7720", "printed_subtotal": 81.75, "printed_hst": 10.63, "printed_total": 92.38, "totals_mismatch": true,
+        "warnings": ["the lines do not add up to the printed subtotal; check each qty and unit cost against the paper"], "model": "sample" }
     },
     {
       "case": "extract-return-line", "label": "the return read as a confident purchase", "expect": "fail", "failsCheck": "line dock line: flagged",
@@ -366,7 +405,8 @@
         { "description": "Boat fender 6.5 x 23 in", "qty": 2, "unit_cost": 22.4, "retail_price_note": null, "confidence": 0.96 },
         { "description": "Bilge pump 600 GPH", "qty": 1, "unit_cost": 64.95, "retail_price_note": null, "confidence": 0.96 },
         { "description": "Dock line 3/8 in x 15 ft", "qty": 2, "unit_cost": 14, "retail_price_note": null, "confidence": 0.95 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "GB-7720", "printed_subtotal": 81.75, "printed_hst": 10.63, "printed_total": 92.38, "totals_mismatch": true,
+        "warnings": ["the lines do not add up to the printed subtotal; check each qty and unit cost against the paper"], "model": "sample" }
     },
     {
       "case": "extract-missing-price", "label": "missing price left at 0", "expect": "pass",
@@ -375,7 +415,8 @@
         { "description": "Pressure treated 2x6x10", "qty": 8, "unit_cost": 17.85, "retail_price_note": null, "confidence": 0.96 },
         { "description": "Cedar post 4x4x8", "qty": 12, "unit_cost": 0, "retail_price_note": null, "confidence": 0.5 },
         { "description": "Concrete mix 30 kg", "qty": 3, "unit_cost": 9.6, "retail_price_note": null, "confidence": 0.96 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "ML-1184", "printed_subtotal": 171.6, "printed_hst": 22.31, "printed_total": 193.91, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
     },
     {
       "case": "extract-missing-price", "label": "a price borrowed from the line above", "expect": "fail", "failsCheck": "line cedar post: unit_cost",
@@ -384,7 +425,39 @@
         { "description": "Pressure treated 2x6x10", "qty": 8, "unit_cost": 17.85, "retail_price_note": null, "confidence": 0.96 },
         { "description": "Cedar post 4x4x8", "qty": 12, "unit_cost": 17.85, "retail_price_note": null, "confidence": 0.7 },
         { "description": "Concrete mix 30 kg", "qty": 3, "unit_cost": 9.6, "retail_price_note": null, "confidence": 0.96 }
-      ], "warnings": [], "model": "sample" }
+      ], "invoice_number": "ML-1184", "printed_subtotal": 171.6, "printed_hst": 22.31, "printed_total": 193.91, "totals_mismatch": true,
+        "warnings": ["the lines do not add up to the printed subtotal; check each qty and unit cost against the paper"], "model": "sample" }
+    },
+    {
+      "case": "extract-page-two", "label": "page 2 read as printed, flagged by the totals check", "expect": "pass",
+      "status": 200,
+      "body": { "vendor": "Lakeland Paper & Janitorial", "invoice_date": "2026-07-15", "notes": "Page 2 of 2", "line_items": [
+        { "description": "Mop head, cotton, 24 oz", "qty": 4, "unit_cost": 8.95, "retail_price_note": null, "confidence": 0.95 },
+        { "description": "Floor cleaner concentrate 4 L", "qty": 2, "unit_cost": 26.5, "retail_price_note": null, "confidence": 0.95 },
+        { "description": "Nitrile gloves, box of 100", "qty": 10, "unit_cost": 12.75, "retail_price_note": null, "confidence": 0.95 }
+      ], "invoice_number": "LPJ-40552", "printed_subtotal": 528.7, "printed_hst": 68.73, "printed_total": 597.43, "totals_mismatch": true,
+        "warnings": ["the lines do not add up to the printed subtotal; check each qty and unit cost against the paper"], "model": "sample" }
+    },
+    {
+      "case": "extract-page-two", "label": "the subtotal worked out from the lines instead of copied", "expect": "fail", "failsCheck": "printed_subtotal",
+      "status": 200,
+      "body": { "vendor": "Lakeland Paper & Janitorial", "invoice_date": "2026-07-15", "notes": "Page 2 of 2", "line_items": [
+        { "description": "Mop head, cotton, 24 oz", "qty": 4, "unit_cost": 8.95, "retail_price_note": null, "confidence": 0.95 },
+        { "description": "Floor cleaner concentrate 4 L", "qty": 2, "unit_cost": 26.5, "retail_price_note": null, "confidence": 0.95 },
+        { "description": "Nitrile gloves, box of 100", "qty": 10, "unit_cost": 12.75, "retail_price_note": null, "confidence": 0.95 }
+      ], "invoice_number": "LPJ-40552", "printed_subtotal": 216.3, "printed_hst": 28.12, "printed_total": 244.42, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
+    },
+    {
+      "case": "extract-page-two", "label": "the carried-forward balance read as a purchase", "expect": "fail", "failsCheck": "no carried line",
+      "status": 200,
+      "body": { "vendor": "Lakeland Paper & Janitorial", "invoice_date": "2026-07-15", "notes": "Page 2 of 2", "line_items": [
+        { "description": "Mop head, cotton, 24 oz", "qty": 4, "unit_cost": 8.95, "retail_price_note": null, "confidence": 0.95 },
+        { "description": "Floor cleaner concentrate 4 L", "qty": 2, "unit_cost": 26.5, "retail_price_note": null, "confidence": 0.95 },
+        { "description": "Nitrile gloves, box of 100", "qty": 10, "unit_cost": 12.75, "retail_price_note": null, "confidence": 0.95 },
+        { "description": "Carried forward from page 1", "qty": 1, "unit_cost": 312.4, "retail_price_note": null, "confidence": 0.95 }
+      ], "invoice_number": "LPJ-40552", "printed_subtotal": 528.7, "printed_hst": 68.73, "printed_total": 597.43, "totals_mismatch": false,
+        "warnings": [], "model": "sample" }
     }
   ]
 }

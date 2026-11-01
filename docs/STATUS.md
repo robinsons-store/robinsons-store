@@ -2,7 +2,41 @@
 
 Single source for the current state of the build: what is done, what is verified, and what remains. The full vision is in robinsons_store_build_spec.md, setup is in RUNBOOK.md, and the per-feature sign-off record is in docs/VERIFICATION.md. Update this file and VERIFICATION.md in the same pull request as the work itself; if it is not recorded there, it is not done.
 
-Last updated: 2026-10-30, on branch claude/feedback-summary-follow-up (latest: every role passes the file check for a screenshot description, below; before it department field follow-ups, below; before it department field export error handling, below; before it screenshot descriptions follow the screenshot, below; before it the nine-diagram Miro board and separate archive, below; before it product direction and skill precedence, below; before it stored files fenced by store and role, below; before it money fenced by role at the database, below; before it PR #86 documents builder self-checks and the develop-to-main release flow, below; before it the AI view and the standards map in the architecture doc, below; before it tier A self-merge wired into the Slack loop, below; before it module checks and automation tests run in CI by convention, below; before it accounts moved, docs brought up to date and the dev environment turned on, below; before it the architecture diagrams corrected against the code, below; before it the architecture record of the AI usage log and the main ruleset, below; before it the money-type and region record round, below; before it the handover written to the standard, with the agents register and onboarding, below; before it the handover is prepared, below; before it the dev guard of 2026-09-01, recorded late; before it the deploy scare, corrected the same day, below; before it the invoice field registry and the first automated migration, below; before it the owner's answer on the vendor question map; before it Jira switched off with its autopilot parked and the watchdog moved to Slack, below; before it the vendor field registry; before it the platform capability round, the health check naming its own fix, owner round 6, owner round 5, the domain and email integration round in docs/DOMAIN_EMAIL.md, the vetting round, the Jira backlog round, the live-demo round, and owner feedback round 3).
+Last updated: 2026-10-30, on branch capture-invoice-checks (latest: the invoice reader's lines checked against the printed totals, below; before it every role passes the file check for a screenshot description, below; before it department field follow-ups, below; before it department field export error handling, below; before it screenshot descriptions follow the screenshot, below; before it the nine-diagram Miro board and separate archive, below; before it product direction and skill precedence, below; before it stored files fenced by store and role, below; before it money fenced by role at the database, below; before it PR #86 documents builder self-checks and the develop-to-main release flow, below; before it the AI view and the standards map in the architecture doc, below; before it tier A self-merge wired into the Slack loop, below; before it module checks and automation tests run in CI by convention, below; before it accounts moved, docs brought up to date and the dev environment turned on, below; before it the architecture diagrams corrected against the code, below; before it the architecture record of the AI usage log and the main ruleset, below; before it the money-type and region record round, below; before it the handover written to the standard, with the agents register and onboarding, below; before it the handover is prepared, below; before it the dev guard of 2026-09-01, recorded late; before it the deploy scare, corrected the same day, below; before it the invoice field registry and the first automated migration, below; before it the owner's answer on the vendor question map; before it Jira switched off with its autopilot parked and the watchdog moved to Slack, below; before it the vendor field registry; before it the platform capability round, the health check naming its own fix, owner round 6, owner round 5, the domain and email integration round in docs/DOMAIN_EMAIL.md, the vetting round, the Jira backlog round, the live-demo round, and owner feedback round 3).
+
+Invoice lines checked against the printed totals, 2026-10-30 (branch capture-invoice-checks, see
+VERIFICATION.md):
+- The invoice reader now also copies the invoice number and the subtotal, HST and total printed
+  on the paper. Capture adds up the lines (qty x unit cost) and compares them with those
+  figures. It is arithmetic, not a second AI call, so it does not count against the 100 calls a
+  day.
+- When they disagree by more than 5 cents, Capture shows the printed figure under the Subtotal
+  with the difference, and will not save until someone ticks "I checked the lines against the
+  invoice total". Retyping the misread line clears it, and a tick lapses if a later edit changes
+  what the lines add up to. A printed figure that cannot be read as a number also needs the tick,
+  unless the lines make the printed subtotal. Staff see that the lines do not add up, never the
+  amounts. The tick is stored with the amber-line acknowledgement; no database change.
+- When the paper prints only a total and the lines make it as it stands, Capture shows the
+  Total as the lines and HST as "not printed", instead of adding 13% on top. Before this, a
+  $113.00 receipt showed a Total of $127.69. Such paper cannot say whether its prices include
+  tax or no tax was charged, so Capture does not guess: the order check compares the lines as
+  they are (a real overcharge is never hidden), and its warning gives the pre-tax figure in
+  case the prices include HST. Nothing saved changes: Capture stores no tax figure.
+- Expect the tick on the second half of a long invoice photographed in two parts: its printed
+  total covers lines that are not in that photo, and the warning says so.
+- Capture's vendor match now ignores case, punctuation ("O'Reilly" is "OReilly"), "&" against "and", and a trailing Inc,
+  Ltd, Limited or Co, within the department. If two vendors match that way, neither is picked.
+- The invoice number goes at the start of the notes; the form has no box for it. One that
+  carries an amount is left blank, since staff read the notes.
+- Proven: scripts/extractvalidate-check 97 of 97, failing under each deliberate break of the
+  check; an independent read-only review found eight issues, all fixed with a test each; the AI eval scorers 124 of 124, with a new case for a photo of page 2 only; the offline
+  eval through the real route 24 of 24, the known gap still failing. Of the 12 wrong answers in
+  the existing eval samples that change what the lines add up to, the totals check flags all 12. It
+  cannot catch a subtotal worked out from the lines instead of copied, or a carried-forward
+  balance read as a purchase; the page-2 case pins both for the live run.
+- Not yet: a live run against the model, and the screen in a browser. Open: when staff save
+  with the lines still not adding up, their costs are saved as read; whether those should be
+  left blank for the owner, as amber costs are, is the owner's call [Q: Ravi Kiran].
 
 
 Department field follow-ups, 2026-10-30:

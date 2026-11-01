@@ -7,7 +7,8 @@
 //
 // The rule is fail closed: any value this has to coerce gets confidence 0 on its line, so it
 // lands in the amber band and goes through the existing acknowledgement and the database
-// trigger rather than being saved quietly.
+// trigger rather than being saved quietly. The lines are also added up and compared with the
+// totals printed on the invoice (checkTotals below), which the capture screen reruns live.
 
 export type ExtractedLine = {
   description: string;
@@ -17,11 +18,23 @@ export type ExtractedLine = {
   confidence: number;
 };
 
-export type Extraction = {
+export type PrintedTotals = {
+  printed_subtotal: number | null;
+  printed_hst: number | null;
+  printed_total: number | null;
+};
+
+export type Extraction = PrintedTotals & {
   vendor: string;
+  invoice_number: string;
   invoice_date: string;
   notes: string;
   line_items: ExtractedLine[];
+  // A printed subtotal, HST or total was not a usable number and was left blank.
+  printed_unreadable: boolean;
+  // The lines do not add up to the figures printed on the paper (checkTotals). The capture
+  // screen makes a person acknowledge it before saving.
+  totals_mismatch: boolean;
 };
 
 const MAX_TEXT = 500;
@@ -42,6 +55,77 @@ function amount(v: unknown, nullable: boolean): { value: number | null; coerced:
   const n = typeof v === "number" ? v : Number(v);
   if (!Number.isFinite(n) || n < 0) return { value: null, coerced: true };
   return { value: n, coerced: typeof v !== "number" };
+}
+
+// ---------- the printed totals ----------
+//
+// Confidence is the reader's own opinion of its work. The subtotal printed on the invoice is
+// not: if qty x unit cost over the lines does not come to it, a line was misread, missed or
+// invented, however sure the reader says it was.
+
+// A few cents covers per-line rounding on the vendor's side.
+export const TOTALS_TOLERANCE = 0.05;
+// Ontario HST. The capture screen passes the live rate from tax_rules instead.
+export const HST_RATE = 0.13;
+
+export type TotalsCheck = {
+  // Sum of qty x unit cost, a missing qty or cost counting as 0, as the capture screen adds it.
+  computed: number;
+  // unchecked: nothing printed to compare against.
+  status: "match" | "mismatch" | "unchecked";
+  against: "subtotal" | "total" | null;
+  printed: number | null;
+  // The lines make the printed total as it stands, on paper that prints no subtotal and no
+  // tax. Either the prices include tax or no tax was charged; the paper cannot say which. The
+  // lines are the total either way, so no tax may be added on top of them.
+  totalAsPrinted: boolean;
+};
+
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+// The lines match when they make the printed subtotal, or the printed total less the tax. A
+// misread subtotal is forgiven when the total still agrees with the lines. The tax is the one
+// printed when there is one (0.00 on zero-rated goods included); HST at the rate is assumed
+// only when none is printed. Lines that make the total as printed (prices that include tax)
+// count only on paper that prints no subtotal and no tax: otherwise they are lines with a tax
+// row read as a purchase. On a mismatch the subtotal is the figure reported.
+//
+// unreadable: one of the printed figures was not a usable number and is null here. It may
+// have been the tax or the subtotal, so only the printed subtotal itself can vouch for the
+// lines; anything else is a mismatch, nothing printed to check included.
+export function checkTotals(
+  lines: { qty: number | null; unit_cost: number | null }[],
+  printed: PrintedTotals,
+  taxRate: number = HST_RATE,
+  unreadable = false
+): TotalsCheck {
+  const computed = round2(lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unit_cost) || 0), 0));
+  const { printed_subtotal: sub, printed_hst: hst, printed_total: total } = printed;
+  const near = (n: number) => Math.abs(computed - n) <= TOTALS_TOLERANCE + 1e-9;
+  if (sub !== null && near(sub)) return { computed, status: "match", against: "subtotal", printed: sub, totalAsPrinted: false };
+  if (!unreadable && sub === null && total === null) return { computed, status: "unchecked", against: null, printed: null, totalAsPrinted: false };
+  if (!unreadable && total !== null) {
+    if (near(hst !== null ? total - hst : total / (1 + taxRate)))
+      return { computed, status: "match", against: "total", printed: total, totalAsPrinted: false };
+    if (sub === null && hst === null && near(total))
+      return { computed, status: "match", against: "total", printed: total, totalAsPrinted: true };
+  }
+  if (sub !== null) return { computed, status: "mismatch", against: "subtotal", printed: sub, totalAsPrinted: false };
+  return total !== null
+    ? { computed, status: "mismatch", against: "total", printed: total, totalAsPrinted: false }
+    : { computed, status: "mismatch", against: null, printed: null, totalAsPrinted: false };
+}
+
+// An invoice number is a short label, not a sentence. One with a dollar sign or an amount in
+// it, over 40 characters or over four words is left blank: it goes into the notes, which
+// staff see, so reader text carrying a money figure must not get there this way.
+function invoiceNumber(v: unknown, warnings: string[]): string {
+  const s = text(v);
+  if (s && (s.length > 40 || s.split(/\s+/).length > 4 || /\$|\d[.,]\d{2}(?!\d)/.test(s))) {
+    warnings.push("invoice number did not look like one; left blank");
+    return "";
+  }
+  return s;
 }
 
 export function normalizeExtraction(parsed: any): { data: Extraction; warnings: string[] } {
@@ -78,8 +162,44 @@ export function normalizeExtraction(parsed: any): { data: Extraction; warnings: 
     line_items.push({ description, qty: qty.value, unit_cost: unit.value, retail_price_note: retail.value, confidence });
   });
 
+  // A printed figure that is not a usable number (a negative one included: a credit note
+  // needs a person anyway) is left blank, and the check fails closed unless the lines make the
+  // printed subtotal (see checkTotals).
+  let unreadable = false;
+  const printedAmount = (field: keyof PrintedTotals, label: string): number | null => {
+    const a = amount(src[field], true);
+    if (a.coerced) {
+      warnings.push(`printed ${label} was not a usable number${a.value === null ? "; left blank" : ""}`);
+      if (a.value === null) unreadable = true;
+    }
+    return a.value;
+  };
+  const printed: PrintedTotals = {
+    printed_subtotal: printedAmount("printed_subtotal", "subtotal"),
+    printed_hst: printedAmount("printed_hst", "HST"),
+    printed_total: printedAmount("printed_total", "total")
+  };
+
+  const totals = checkTotals(line_items, printed, HST_RATE, unreadable);
+  if (totals.status === "mismatch") {
+    warnings.push(
+      unreadable && totals.against !== "subtotal"
+        ? "the lines could not be checked against the printed totals; check each qty and unit cost against the paper"
+        : `the lines do not add up to the printed ${totals.against}; check each qty and unit cost against the paper`
+    );
+  }
+
   return {
-    data: { vendor: text(src.vendor), invoice_date, notes: text(src.notes), line_items },
+    data: {
+      vendor: text(src.vendor),
+      invoice_number: invoiceNumber(src.invoice_number, warnings),
+      invoice_date,
+      notes: text(src.notes),
+      ...printed,
+      line_items,
+      printed_unreadable: unreadable,
+      totals_mismatch: totals.status === "mismatch"
+    },
     warnings
   };
 }

@@ -16,6 +16,9 @@ export type DocSpec = {
   table?: {
     columns: [string, string, string, string];
     money?: "plain" | "dollar" | "fr";
+    // A balance brought from an earlier page, printed above the rows and counted in the
+    // subtotal: the second page of an invoice photographed on its own.
+    carried?: { label: string; amount: number };
     rows: TableRow[];
   };
   // Labels for the rows under the table. HST is Ontario's 13 percent of the subtotal.
@@ -50,16 +53,31 @@ function pdfText(s: string): string {
   return `(${out})`;
 }
 
+// The figures under the table, as printed: null for a row the case does not print.
+export function printedTotals(spec: DocSpec): { subtotal: number | null; hst: number | null; total: number | null } {
+  const t = spec.table;
+  let subtotal = t?.carried ? t.carried.amount : 0;
+  for (const [qty, , unit] of t?.rows || []) subtotal = round2(subtotal + (typeof unit === "number" ? round2(qty * unit) : 0));
+  const labels = spec.totals || {};
+  const hst = labels.hst ? round2(subtotal * 0.13) : 0;
+  return {
+    subtotal: labels.subtotal ? subtotal : null,
+    hst: labels.hst ? hst : null,
+    total: labels.total ? round2(subtotal + hst) : null
+  };
+}
+
 export function tableLines(spec: DocSpec): { text: string; note?: string }[] {
   const t = spec.table;
   if (!t) return [];
   const style = t.money || "plain";
   const out: { text: string; note?: string }[] = [];
-  let subtotal = 0;
+  if (t.carried) {
+    out.push({ text: " ".repeat(W.qty + 2) + t.carried.label.padEnd(W.desc) + "  " + " ".repeat(W.unit) + "  " + money(t.carried.amount, style).padStart(W.amount) });
+  }
   for (const [qty, desc, unit, note] of t.rows) {
     const priced = typeof unit === "number";
     const amount = priced ? round2(qty * unit) : 0;
-    subtotal = round2(subtotal + amount);
     out.push({
       text:
         String(qty).padStart(W.qty) +
@@ -73,13 +91,12 @@ export function tableLines(spec: DocSpec): { text: string; note?: string }[] {
     });
   }
   const labels = spec.totals || {};
-  const hst = labels.hst ? round2(subtotal * 0.13) : 0;
-  const total = round2(subtotal + hst);
-  const sum = (label: string, n: number) => ({ text: label.padStart(W.qty + 2 + W.desc + 2 + W.unit) + "  " + money(n, style).padStart(W.amount) });
+  const printed = printedTotals(spec);
+  const sum = (label: string, n: number | null) => ({ text: label.padStart(W.qty + 2 + W.desc + 2 + W.unit) + "  " + money(n ?? 0, style).padStart(W.amount) });
   if (labels.subtotal || labels.hst || labels.total) out.push({ text: "" });
-  if (labels.subtotal) out.push(sum(labels.subtotal, subtotal));
-  if (labels.hst) out.push(sum(labels.hst, hst));
-  if (labels.total) out.push(sum(labels.total, total));
+  if (labels.subtotal) out.push(sum(labels.subtotal, printed.subtotal));
+  if (labels.hst) out.push(sum(labels.hst, printed.hst));
+  if (labels.total) out.push(sum(labels.total, printed.total));
   return out;
 }
 

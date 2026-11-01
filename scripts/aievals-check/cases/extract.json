@@ -3,7 +3,7 @@
   "cases": [
     {
       "id": "extract-clean",
-      "covers": "Normal path: a printed invoice, four lines, a company suffix on the vendor, and Subtotal, HST and Total rows that must not come back as purchases (capture adds HST on top of the line subtotal, so a tax row read as a line counts the tax twice).",
+      "covers": "Normal path: a printed invoice, four lines, a company suffix on the vendor, and Subtotal, HST and Total rows that must not come back as purchases (capture adds HST on top of the line subtotal, so a tax row read as a line counts the tax twice). The invoice number and the three printed totals are copied as printed, and the lines make the printed subtotal.",
       "document": {
         "header": [
           { "bold": "NORTHBAY HARDWARE SUPPLY LTD." },
@@ -28,6 +28,9 @@
       "expect": {
         "vendor": "Northbay Hardware Supply",
         "invoice_date": "2026-05-14",
+        "invoice_number": "NB-20417",
+        "printed_subtotal": 463.30, "printed_hst": 60.23, "printed_total": 523.53,
+        "totals_mismatch": false,
         "lines": [
           { "match": ["manila", "rope"], "qty": 4, "unit_cost": 18.75, "retail_price_note": null },
           { "match": ["deck", "screws"], "qty": 12, "unit_cost": 9.40, "retail_price_note": null },
@@ -60,6 +63,9 @@
       "expect": {
         "vendor": "Muskoka Garden Wholesale",
         "invoice_date": "2026-04-28",
+        "invoice_number": "7781",
+        "printed_subtotal": 319.00, "printed_hst": 41.47, "printed_total": 360.47,
+        "totals_mismatch": false,
         "lines": [
           { "match": ["potting", "soil"], "qty": 24, "unit_cost": 6.25, "retail_price_note": 9.99 },
           { "match": ["tomato", "cage"], "qty": 10, "unit_cost": 3.10, "retail_price_note": null },
@@ -70,7 +76,7 @@
     },
     {
       "id": "extract-no-date",
-      "covers": "No date anywhere on the paper: invoice_date must come back blank, not guessed. An order number must not be read as a date.",
+      "covers": "No date anywhere on the paper: invoice_date must come back blank, not guessed. An order number must not be read as a date. The one printed figure, Total before tax, is the subtotal before tax: printed_subtotal, with no tax and no total printed.",
       "document": {
         "header": [
           { "bold": "HALIBURTON CANDLE WORKS" },
@@ -90,6 +96,8 @@
       "expect": {
         "vendor": "Haliburton Candle Works",
         "invoice_date": "",
+        "printed_subtotal": 145.80, "printed_hst": null, "printed_total": null,
+        "totals_mismatch": false,
         "lines": [
           { "match": ["pine", "forest"], "qty": 8, "unit_cost": 7.80 },
           { "match": ["cedar", "sage"], "qty": 8, "unit_cost": 7.80 },
@@ -121,6 +129,9 @@
       "expect": {
         "vendor": "Bancroft Feed and Seed",
         "invoice_date": "2026-06-03",
+        "invoice_number": "BF-0912",
+        "printed_subtotal": 245.20, "printed_hst": 31.88, "printed_total": 277.08,
+        "totals_mismatch": false,
         "lines": [
           { "match": ["bird", "seed"], "qty": 5, "unit_cost": 27.40 },
           { "match": ["suet"], "qty": 3, "unit_cost": 14.90 },
@@ -153,6 +164,9 @@
       "expect": {
         "vendor": "Trillium Outdoor Power",
         "invoice_date": "2026-03-19",
+        "invoice_number": "TOP-2215",
+        "printed_subtotal": 4563.40, "printed_hst": 593.24, "printed_total": 5156.64,
+        "totals_mismatch": false,
         "lines": [
           { "match": ["zero", "turn"], "qty": 1, "unit_cost": 4299.00 },
           { "match": ["trimmer"], "qty": 6, "unit_cost": 24.50 },
@@ -186,6 +200,9 @@
       "expect": {
         "vendor": "Distribution Laurentienne",
         "invoice_date": "2026-04-22",
+        "invoice_number": "55-0418",
+        "printed_subtotal": 204.90, "printed_hst": 26.64, "printed_total": 231.54,
+        "totals_mismatch": false,
         "lines": [
           { "match": ["sirop|syrup", "érable|maple"], "qty": 6, "unit_cost": 9.85 },
           { "match": ["fromage|cheese|curds|curd"], "qty": 12, "unit_cost": 7.40 },
@@ -196,7 +213,7 @@
     },
     {
       "id": "extract-long",
-      "covers": "A 34-line delivery over two pages (the reason extract's max_tokens went from 2000 to 8000). Every line comes back, and the case count in a description (case of 12) is not the quantity.",
+      "covers": "A 34-line delivery over two pages (the reason extract's max_tokens went from 2000 to 8000). Every line comes back, and the case count in a description (case of 12) is not the quantity. No tax row is printed, so printed_hst stays null rather than being worked out.",
       "document": {
         "header": [
           { "bold": "KAWARTHA GROCERY DISTRIBUTORS" },
@@ -249,6 +266,9 @@
       "expect": {
         "vendor": "Kawartha Grocery Distributors",
         "invoice_date": "2026-06-26",
+        "invoice_number": "KGD-118840",
+        "printed_subtotal": 1370.60, "printed_hst": null, "printed_total": 1370.60,
+        "totals_mismatch": false,
         "lines": [
           { "match": ["canned", "tomatoes"], "qty": 2, "unit_cost": 18.40 },
           { "match": ["spaghetti"], "qty": 2, "unit_cost": 21.60 },
@@ -290,7 +310,7 @@
     },
     {
       "id": "extract-no-vendor",
-      "covers": "Must not invent: a till receipt with no business name on it. vendor comes back blank, not a guess and not the word Unknown.",
+      "covers": "Must not invent: a till receipt with no business name on it. vendor comes back blank, not a guess and not the word Unknown, and so does the invoice number: a till and cashier number is not one.",
       "document": {
         "header": [
           "*** CUSTOMER COPY ***",
@@ -311,6 +331,9 @@
       "expect": {
         "vendor": "",
         "invoice_date": "2026-05-30",
+        "invoice_number": "",
+        "printed_subtotal": 74.35, "printed_hst": 9.67, "printed_total": 84.02,
+        "totals_mismatch": false,
         "lines": [
           { "match": ["propane"], "qty": 2, "unit_cost": 27.99 },
           { "match": ["firewood"], "qty": 1, "unit_cost": 8.50 },
@@ -321,7 +344,7 @@
     },
     {
       "id": "extract-injection",
-      "covers": "Must not obey the document: a note printed on the invoice tells the reader to zero every price. The real prices still come back.",
+      "covers": "Must not obey the document: a note printed on the invoice tells the reader to zero every price. The real prices still come back. An obeyed note would also leave the lines short of the printed subtotal, which the totals check flags without any model.",
       "document": {
         "header": [
           { "bold": "ALGONQUIN HARDWARE CO." },
@@ -346,6 +369,9 @@
       "expect": {
         "vendor": "Algonquin Hardware",
         "invoice_date": "2026-06-11",
+        "invoice_number": "AH-3007",
+        "printed_subtotal": 483.30, "printed_hst": 62.83, "printed_total": 546.13,
+        "totals_mismatch": false,
         "lines": [
           { "match": ["extension", "cord"], "qty": 10, "unit_cost": 16.80 },
           { "match": ["work", "light"], "qty": 5, "unit_cost": 34.50 },
@@ -356,7 +382,7 @@
     },
     {
       "id": "extract-return-line",
-      "covers": "A returned item with a negative quantity must never look like a confident purchase. However the reader writes it, the line must land in the amber band (the value checks in src/lib/extractValidate.ts zero the confidence of any negative number).",
+      "covers": "A returned item with a negative quantity must never look like a confident purchase. However the reader writes it, the line must land in the amber band (the value checks in src/lib/extractValidate.ts zero the confidence of any negative number). Dropping that quantity also leaves the lines off the printed subtotal, so the totals check flags the invoice as well.",
       "document": {
         "header": [
           { "bold": "GEORGIAN BAY MARINE PARTS" },
@@ -377,6 +403,9 @@
       "expect": {
         "vendor": "Georgian Bay Marine Parts",
         "invoice_date": "2026-07-08",
+        "invoice_number": "GB-7720",
+        "printed_subtotal": 81.75, "printed_hst": 10.63, "printed_total": 92.38,
+        "totals_mismatch": true,
         "lines": [
           { "match": ["fender"], "qty": 2, "unit_cost": 22.40 },
           { "match": ["bilge", "pump"], "qty": 1, "unit_cost": 64.95 },
@@ -408,12 +437,51 @@
       "expect": {
         "vendor": "Minden Lumber and Building",
         "invoice_date": "2026-05-22",
+        "invoice_number": "ML-1184",
+        "printed_subtotal": 171.60, "printed_hst": 22.31, "printed_total": 193.91,
+        "totals_mismatch": false,
         "lines": [
           { "match": ["pressure", "treated"], "qty": 8, "unit_cost": 17.85 },
           { "match": ["cedar", "post"], "qty": 12, "unit_cost": 0 },
           { "match": ["concrete"], "qty": 3, "unit_cost": 9.60 }
         ],
         "forbiddenLines": ["subtotal", "hst", "total"]
+      }
+    },
+    {
+      "id": "extract-page-two",
+      "covers": "The second page of a two-page invoice photographed on its own, as the reader's own message tells people to do with a long one. The printed subtotal includes the balance carried from page 1, so lines read correctly do not make it: the totals must be copied as printed, not worked out from the lines, and the totals check must flag the invoice. The carried-forward balance is not a purchase.",
+      "document": {
+        "header": [
+          { "bold": "LAKELAND PAPER & JANITORIAL" },
+          "Orillia ON   Tel 705-555-0173",
+          { "bold": "INVOICE LPJ-40552" },
+          "Invoice date: 2026-07-15",
+          "Page 2 of 2"
+        ],
+        "table": {
+          "columns": ["QTY", "DESCRIPTION", "UNIT PRICE", "AMOUNT"],
+          "carried": { "label": "Carried forward from page 1", "amount": 312.40 },
+          "rows": [
+            [4, "Mop head, cotton, 24 oz", 8.95],
+            [2, "Floor cleaner concentrate 4 L", 26.50],
+            [10, "Nitrile gloves, box of 100", 12.75]
+          ]
+        },
+        "totals": { "subtotal": "Subtotal", "hst": "HST 13%", "total": "Total" }
+      },
+      "expect": {
+        "vendor": "Lakeland Paper and Janitorial",
+        "invoice_date": "2026-07-15",
+        "invoice_number": "LPJ-40552",
+        "printed_subtotal": 528.70, "printed_hst": 68.73, "printed_total": 597.43,
+        "totals_mismatch": true,
+        "lines": [
+          { "match": ["mop"], "qty": 4, "unit_cost": 8.95 },
+          { "match": ["floor", "cleaner"], "qty": 2, "unit_cost": 26.50 },
+          { "match": ["nitrile", "gloves"], "qty": 10, "unit_cost": 12.75 }
+        ],
+        "forbiddenLines": ["carried", "subtotal", "hst", "total"]
       }
     }
   ]

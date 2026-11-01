@@ -10,5 +10,5 @@
     "paths": { "@/*": ["src/*"] },
     "lib": ["es2020"]
   },
-  "include": ["../../src/lib/extractValidate.ts", "../../src/lib/captureLines.ts"]
+  "include": ["../../src/lib/extractValidate.ts", "../../src/lib/captureLines.ts", "../../src/lib/vendorMatch.ts"]
 }

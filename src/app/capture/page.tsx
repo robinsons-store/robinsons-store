@@ -10,7 +10,9 @@ import { documentPath } from "@/lib/documentPath";
 import { REQUIRE_AUTH, authHeader, canSeeMoney, useEffectiveActor } from "@/lib/auth";
 import type { AppUser, Department, Draft, LineItem } from "@/lib/types";
 import { prepareForExtraction, readableSize } from "@/lib/imagePrep";
-import { editLine, linesToSave } from "@/lib/captureLines";
+import { editLine, linesToSave, notesWithInvoiceNumber } from "@/lib/captureLines";
+import { checkTotals, type PrintedTotals } from "@/lib/extractValidate";
+import { matchVendor } from "@/lib/vendorMatch";
 
 type VendorLite = { id: string; name: string; department_id: string | null; default_terms: string | null };
 type POLite = { vendor_id: string | null; order_amount: number | null };
@@ -40,6 +42,12 @@ export default function Capture() {
   const [manual, setManual] = useState(false);
   const [ack, setAck] = useState(false);
   const [lowAck, setLowAck] = useState(false);
+  // The totals printed on the invoice, and whether one of them could not be read
+  // (lib/extractValidate). None for a manual entry: there is no paper to check against.
+  const [printed, setPrinted] = useState<(PrintedTotals & { unreadable: boolean }) | null>(null);
+  // The lines' sum when the person ticked the totals box. The tick holds only while the lines
+  // still add up to that, so a later edit that moves the amounts asks again.
+  const [totalsAckAt, setTotalsAckAt] = useState<number | null>(null);
 
   const [extracting, setExtracting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -96,6 +104,8 @@ export default function Capture() {
     setManual(false);
     setAck(false);
     setLowAck(false);
+    setPrinted(null);
+    setTotalsAckAt(null);
     setReduced(null);
     setFile(f);
     if (preview) URL.revokeObjectURL(preview);
@@ -113,6 +123,8 @@ export default function Capture() {
     setPreview(null);
     setAck(false);
     setLowAck(false);
+    setPrinted(null);
+    setTotalsAckAt(null);
     setManual(true);
     setDraft({ vendor: "", invoice_date: "", notes: "", line_items: [{ description: "", qty: null, unit_cost: null, retail_price_note: null, confidence: 1 }] });
   }
@@ -136,10 +148,17 @@ export default function Capture() {
       if (!resp.ok) throw new Error(data.error || "extraction failed");
       setAck(false);
       setLowAck(false);
+      setTotalsAckAt(null);
+      setPrinted({
+        printed_subtotal: data.printed_subtotal ?? null,
+        printed_hst: data.printed_hst ?? null,
+        printed_total: data.printed_total ?? null,
+        unreadable: data.printed_unreadable === true
+      });
       setDraft({
         vendor: data.vendor || "",
         invoice_date: data.invoice_date || "",
-        notes: data.notes || "",
+        notes: notesWithInvoiceNumber(data.notes || "", data.invoice_number || ""),
         line_items: (data.line_items || []).map((l: any) => ({
           description: l.description || "",
           qty: l.qty ?? null,
@@ -174,15 +193,26 @@ export default function Capture() {
     setDraft({ ...draft, line_items: draft.line_items.filter((_, idx) => idx !== i) });
   }
 
-  // Totals (pre-tax subtotal, HST, total). Money is dollars in the demo.
-  const subtotal = draft ? round2(draft.line_items.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unit_cost) || 0), 0)) : 0;
-  const hst = round2(subtotal * taxRate);
-  const total = round2(subtotal + hst);
+  // The lines against the totals printed on the invoice (lib/extractValidate), rerun on every
+  // edit, so retyping the misread line clears it. The acknowledgement is the amber-line one
+  // (low_confidence_ack): both say a person checked lines the reader may have got wrong.
+  const totalsCheck = draft && printed ? checkTotals(draft.line_items, printed, taxRate, printed.unreadable) : null;
+  const totalAsPrinted = totalsCheck?.totalAsPrinted === true;
 
-  // Match the typed vendor to a known vendor in this department, then look for an order to reconcile against.
-  const matchedVendor = draft
-    ? vendors.find((v) => v.department_id === deptId && v.name.trim().toLowerCase() === draft.vendor.trim().toLowerCase())
-    : undefined;
+  // Totals. Money is dollars in the demo. Lines that make a printed total with no tax printed
+  // (totalAsPrinted) are the total: the prices include tax or none was charged, so no HST is
+  // added and none is invented. The order check still compares the lines as they are, so a
+  // real overcharge is never hidden by guessing the prices include tax.
+  const subtotal = draft ? round2(draft.line_items.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unit_cost) || 0), 0)) : 0;
+  const hst = totalAsPrinted ? null : round2(subtotal * taxRate);
+  const total = hst === null ? subtotal : round2(subtotal + hst);
+  const totalsMismatch = totalsCheck?.status === "mismatch";
+  const totalsAck = totalsCheck !== null && totalsAckAt === totalsCheck.computed;
+  const totalsDiff = totalsCheck && totalsCheck.printed !== null ? round2(totalsCheck.computed - totalsCheck.printed) : null;
+
+  // Match the read vendor to a known vendor in this department, case, punctuation and a
+  // company suffix aside (lib/vendorMatch), then look for an order to reconcile against.
+  const matchedVendor = draft ? matchVendor(vendors, deptId, draft.vendor) : undefined;
   const matchedPO = matchedVendor ? pos.find((p) => p.vendor_id === matchedVendor.id && p.order_amount != null) : undefined;
   const orderAmount = matchedPO?.order_amount ?? null;
   const discrepancy = orderAmount != null ? round2(subtotal - orderAmount) : null;
@@ -203,6 +233,7 @@ export default function Capture() {
     if (!draft || (!file && !manual) || !deptId || !effectiveActorId || !storeId) return;
     if (hasDiscrepancy && !ack) return;
     if (hasLowFlags && !lowAck) return;
+    if (totalsMismatch && !totalsAck) return;
     setSaving(true);
     setError(null);
     try {
@@ -227,7 +258,7 @@ export default function Capture() {
           source_file_path: path,
           status: "confirmed",
           discrepancy_ack: hasDiscrepancy ? ack : false,
-          low_confidence_ack: hasLowFlags ? lowAck : false,
+          low_confidence_ack: (hasLowFlags && lowAck) || (totalsMismatch && totalsAck),
           created_by: effectiveActorId
         })
         .select("id")
@@ -253,6 +284,8 @@ export default function Capture() {
       setPreview(null);
       setAck(false);
       setLowAck(false);
+      setPrinted(null);
+      setTotalsAckAt(null);
       setTimeout(() => router.push("/"), 900);
     } catch (e: any) {
       setError(e.message);
@@ -360,7 +393,7 @@ export default function Capture() {
             <div className="card" style={{ padding: 12, background: "var(--warning-tint)", borderColor: "var(--warning-base)" }}>
               <span className="chip chip-warning">&#9888; Order vs invoiced</span>
               <p className="help" style={{ marginTop: 8, color: "var(--text-primary)" }}>
-                Ordered {formatCAD(orderAmount)} vs invoiced {formatCAD(subtotal)} (pre-tax).{" "}
+                Ordered {formatCAD(orderAmount)} vs invoiced {formatCAD(subtotal)} ({totalAsPrinted ? `the invoice prints no tax; if its prices include HST, the pre-tax amount is ${formatCAD(round2(subtotal / (1 + taxRate)))}` : "pre-tax"}).{" "}
                 {discrepancy! < 0
                   ? `Short by ${formatCAD(Math.abs(discrepancy!))}. Check for missing items.`
                   : `Over by ${formatCAD(discrepancy!)}. Check for extra or unordered items.`}
@@ -428,9 +461,36 @@ export default function Capture() {
 
           {showMoney && (
             <div style={{ maxWidth: 280, marginLeft: "auto", width: "100%" }}>
-              <div className="totals-row"><span className="help">Subtotal</span><span className="tabular">{formatCAD(subtotal)}</span></div>
-              <div className="totals-row"><span className="help">HST ({Math.round(taxRate * 100)}%)</span><span className="tabular">{formatCAD(hst)}</span></div>
+              <div className="totals-row"><span className="help">{totalAsPrinted ? "Lines" : "Subtotal"}</span><span className="tabular">{formatCAD(subtotal)}</span></div>
+              {totalsCheck && totalsCheck.printed !== null && (
+                <div className="totals-row">
+                  <span className="help">{totalsCheck.against === "subtotal" ? "Invoice subtotal" : "Invoice total"}</span>
+                  <span className="tabular" style={totalsMismatch ? { color: "var(--warning-base)", fontWeight: 600 } : undefined}>{formatCAD(totalsCheck.printed)}</span>
+                </div>
+              )}
+              <div className="totals-row"><span className="help">HST{hst === null ? "" : ` (${Math.round(taxRate * 100)}%)`}</span><span className="tabular">{hst === null ? "not printed" : formatCAD(hst)}</span></div>
               <div className="totals-row total"><span>Total</span><span className="tabular">{formatCAD(total)}</span></div>
+            </div>
+          )}
+
+          {/* Staff see that the lines disagree with the paper, never by how much. */}
+          {totalsMismatch && totalsCheck && (
+            <div className="card" style={{ padding: 12, background: "var(--warning-tint)", borderColor: "var(--warning-base)" }}>
+              <span className="chip chip-warning">&#9888; Lines vs invoice total</span>
+              <p className="help" style={{ marginTop: 8, color: "var(--text-primary)" }}>
+                {!showMoney
+                  ? "The lines do not add up to the total printed on the invoice. Check every description and qty against the paper, and that no line is missing or extra."
+                  : totalsCheck.printed === null || (printed?.unreadable && totalsCheck.against !== "subtotal")
+                    ? "A total printed on the invoice could not be read as a number, so the lines could not be checked against the invoice's totals. Check each qty and unit cost against the paper."
+                    : totalsCheck.against === "subtotal"
+                      ? `The lines add up to ${formatCAD(totalsCheck.computed)} but the invoice prints a subtotal of ${formatCAD(totalsCheck.printed)}, ${totalsDiff! < 0 ? "short" : "over"} by ${formatCAD(Math.abs(totalsDiff!))}. Check each qty and unit cost against the paper.`
+                      : `The lines add up to ${formatCAD(totalsCheck.computed)}, which does not match the invoice's printed total of ${formatCAD(totalsCheck.printed)} with or without HST. Check each qty and unit cost against the paper.`}{" "}
+                If this photo is only part of the invoice, the printed total also covers lines that are not in it.
+              </p>
+              <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8, fontSize: 13 }}>
+                <input type="checkbox" checked={totalsAck} onChange={(e) => setTotalsAckAt(e.target.checked ? totalsCheck.computed : null)} />
+                I checked the lines against the invoice total
+              </label>
             </div>
           )}
 
@@ -440,7 +500,7 @@ export default function Capture() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <button className="btn-primary" style={{ flex: "1 1 200px", minWidth: 160, maxWidth: 360 }} onClick={save} disabled={saving || !storeId || (hasDiscrepancy && !ack) || (hasLowFlags && !lowAck)}>
+            <button className="btn-primary" style={{ flex: "1 1 200px", minWidth: 160, maxWidth: 360 }} onClick={save} disabled={saving || !storeId || (hasDiscrepancy && !ack) || (hasLowFlags && !lowAck) || (totalsMismatch && !totalsAck)}>
               {saving ? "Saving." : "Save to feed"}
             </button>
             {hasDiscrepancy && !ack && (
@@ -448,6 +508,9 @@ export default function Capture() {
             )}
             {hasLowFlags && !lowAck && (
               <span className="help">Check the amber lines to save.</span>
+            )}
+            {totalsMismatch && !totalsAck && (
+              <span className="help">Check the lines against the invoice total to save.</span>
             )}
           </div>
         </div>
