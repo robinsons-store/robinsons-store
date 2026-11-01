@@ -79,7 +79,7 @@ which is what stops it eating itself), joins and leaves, and thread replies. Rep
 skipped because a thread under a finished request is usually people talking about it, and
 treating each comment as a new build turns one conversation into ten pull requests.
 
-Oldest first, so whoever asked first is served first.
+Requests are taken oldest first, so whoever asked first is served first.
 
 ## How you ask it for something
 
