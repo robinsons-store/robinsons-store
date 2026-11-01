@@ -186,6 +186,10 @@ Every name the code and workflows read [V-run, search of `process.env` in `src/`
 | `AI_DAILY_CAP_PER_STORE` | Set by hand | Optional; AI calls per store per Ontario day, the code defaults to 100 [R `src/lib/aiUsage.ts:28`]. A change applies after a redeploy | No |
 | `CRON_SECRET` | Made up | Same value as the GitHub secret | **Yes** |
 | `RESEND_API_KEY`, `ALERT_EMAIL_FROM`, `ALERT_EMAIL_TO` | Resend, set by hand | Only when the daily email is wanted | Key only |
+| `SLACK_SIGNING_SECRET` | Slack app, Basic Information | NEW (ADR-006), not yet set. Ask in Slack: without it `/api/slack/events` refuses every request | **Yes** |
+| `SLACK_BOT_TOKEN` | Slack app | NEW in Vercel (ADR-006), not yet set; same value as the GitHub secret. Posts the answers | **Yes** |
+| `SLACK_REQUEST_CHANNEL` | Slack | NEW in Vercel (ADR-006), not yet set; the channel id the answers are given in, same as the GitHub variable | No |
+| `SLACK_STORE_ID` | Supabase, `store.id` | NEW (ADR-006), not yet set; which store a Slack question is answered about. Unset: "not set up" replies, no model call | No |
 
 **GitHub, Actions repository secrets**
 
@@ -208,6 +212,13 @@ Every name the code and workflows read [V-run, search of `process.env` in `src/`
 | `DEV_URL` | The dev site, once it exists |
 | `SLACK_REQUEST_CHANNEL` | The Slack channel ID the autopilot reads (accepted as a secret too) |
 | `SLACK_REQUIRE_MENTION` | Optional. `false` only for a requests-only channel |
+
+**Slack app, scopes and events** (the app from `docs/slack-app-manifest.yml`)
+
+| What | Why | State |
+|---|---|---|
+| Scopes `channels:history`, `chat:write`, `reactions:read`, `reactions:write` | The build sweep and its status card | Set |
+| Scope `app_mentions:read`, Event Subscriptions on with bot event `app_mention`, Request URL `https://<the app's address>/api/slack/events` | Ask in Slack (ADR-006). Changing scopes needs the app reinstalled to the workspace | NEW, not yet set; the manifest is unchanged until approved |
 
 ## Proof the move worked
 

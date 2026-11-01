@@ -4,6 +4,19 @@ Single source for the current state of the build: what is done, what is verified
 
 Last updated: 2026-10-25, on branch claude/architecture-ai-call-ruleset (latest: the architecture record of the AI usage log and the main ruleset, below; before it the money-type and region record round, below; before it the handover written to the standard, with the agents register and onboarding, below; before it the handover is prepared, below; before it the dev guard of 2026-09-01, recorded late; before it the deploy scare, corrected the same day, below; before it the invoice field registry and the first automated migration, below; before it the owner's answer on the vendor question map; before it Jira switched off with its autopilot parked and the watchdog moved to Slack, below; before it the vendor field registry; before it the platform capability round, the health check naming its own fix, owner round 6, owner round 5, the domain and email integration round in docs/DOMAIN_EMAIL.md, the vetting round, the Jira backlog round, the live-demo round, and owner feedback round 3).
 
+Ask in Slack, 2026-10-30 (branch claude/slack-answers-2d32e7, ADR-006):
+- A question that names the bot in the requests channel is answered in its thread from the
+  store's records by `/api/slack/events` (Slack Events API to the existing Vercel project;
+  seconds, not the sweep's 30 minutes). Build requests still go to the sweep, which now skips
+  questions and unclear messages; unclear ones get one reply asking for `ask:` or `build:`.
+  One word rule decides for both: `.github/scripts/slack-intent.cjs`.
+- Money: the asker is treated as staff. No invoice read, no vendor money column, and an
+  answer with a dollar figure is withheld. Grounding, daily cap and `ai_call` log are the ask
+  route's (route `slack_ask`). Store from `SLACK_STORE_ID`, name from the `store` table.
+- The app guide no longer names one store.
+- BUILT in code, verified by machine; SCAFFOLDED live: needs the four Vercel values and the
+  Slack scope and event in docs/HANDOVER.md, not yet set, and one live question.
+
 Architecture record of the AI usage log and the main ruleset, 2026-10-25:
 - docs/ARCHITECTURE.md section 2 now shows the API writing the `ai_call` log and describes
   the daily per-store cap (default 100 calls a day, `AI_DAILY_CAP_PER_STORE`); section 5 lists

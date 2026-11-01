@@ -6,6 +6,8 @@
 // Both failures look like silence from the outside.
 
 import { pickWork, PICKED_UP, DONE, STOPPED, CLAIMED } from "./slack-find-work.mjs";
+import { createRequire } from "node:module";
+const { ANSWERED, ASKED_WHICH } = createRequire(import.meta.url)("./slack-intent.cjs");
 
 let pass = 0, fail = 0;
 const t = (name, ok, detail = "") => {
@@ -20,8 +22,8 @@ const msg = (over = {}) => ({ ts: "100.1", text: "add a column for the rep phone
 const pick = (messages, opts = {}) => pickWork(messages, { requireMention: false, ...opts });
 
 // Slack hands back newest first. People expect a queue to serve whoever asked first.
-const three = [msg({ ts: "300.0", text: "third" }), msg({ ts: "200.0", text: "second" }), msg({ ts: "100.0", text: "first" })];
-t("takes the oldest waiting request, not the newest", pick(three)?.text === "first", pick(three)?.text);
+const three = [msg({ ts: "300.0", text: "add a third column" }), msg({ ts: "200.0", text: "add a second column" }), msg({ ts: "100.0", text: "add a first column" })];
+t("takes the oldest waiting request, not the newest", pick(three)?.text === "add a first column", pick(three)?.text);
 
 // The loop-stopper. Without this it picks the same message every sweep, forever.
 t("skips a request already picked up",
@@ -60,8 +62,8 @@ t("a message with no text is not work", pick([msg({ text: "" })]) === null);
 t("a message of only spaces is not work", pick([msg({ text: "   " })]) === null);
 
 // Running one specific message by hand, for when somebody wants a particular request built.
-const two = [msg({ ts: "200.0", text: "second" }), msg({ ts: "100.0", text: "first" })];
-t("can be pinned to one message", pick(two, { onlyTs: "200.0" })?.text === "second");
+const two = [msg({ ts: "200.0", text: "add a second column" }), msg({ ts: "100.0", text: "add a first column" })];
+t("can be pinned to one message", pick(two, { onlyTs: "200.0" })?.text === "add a second column");
 t("pinning to a claimed message still refuses it",
   pick([msg({ ts: "200.0", reactions: [{ name: PICKED_UP }] })], { onlyTs: "200.0" }) === null);
 
@@ -94,7 +96,30 @@ t("no bot id and mention required means nothing is work",
 
 // The opt-out, for a channel that exists only for requests.
 t("a requests-only channel can take plain messages",
-  pickWork([hello], { requireMention: false })?.ts === "50.0");
+  pickWork([{ ts: "50.0", text: "add a column for the rep phone" }], { requireMention: false })?.ts === "50.0");
+
+// QUESTIONS ARE ANSWERED, NOT BUILT (docs/adr/ADR-006-questions-in-slack-are-answered-in-the-thread.md).
+// The app's Slack answer route replies to these in seconds; the sweep must never also turn
+// one into a pull request. The same rule decides for both: .github/scripts/slack-intent.cjs.
+t("a question naming the bot is NOT a build request",
+  pickWork([{ ts: "61.0", text: `${AT} when is the candle order due?` }], { requireMention: true, botUserId: BOT }) === null);
+t("an ask: prefix is NOT a build request, even worded like one",
+  pick([msg({ text: "ask: add a phone column?" })]) === null);
+t("an unclear message is NOT a build request; the answer route asks which",
+  pick([msg({ text: "I need the phone number for Pinecrest" })]) === null);
+t("plain chatter in a requests-only channel is NOT a build request",
+  pickWork([hello], { requireMention: false }) === null);
+t("a build: prefix is built, with the prefix removed",
+  pick([msg({ text: "build: why does the price sign print small?" })])?.text === "why does the price sign print small?",
+  pick([msg({ text: "build: why does the price sign print small?" })])?.text);
+t("a polite build request is still built",
+  pickWork([{ ts: "62.0", text: `${AT} can you add a rep phone column?` }], { requireMention: true, botUserId: BOT })?.ts === "62.0");
+t("a question skipped does not hide an older build request behind it",
+  pick([msg({ ts: "200.0", text: "when is the order due?" }), msg({ ts: "100.0", text: "add a rep phone column" })])?.ts === "100.0");
+t("the answer route's reactions count as claimed",
+  CLAIMED.includes(ANSWERED) && CLAIMED.includes(ASKED_WHICH), CLAIMED.join(","));
+t("a message the answer route already asked about is not built after an edit",
+  pick([msg({ text: "build: add a column", reactions: [{ name: ASKED_WHICH }] })]) === null);
 
 
 console.log(`\n${pass}/${pass + fail} passed`);

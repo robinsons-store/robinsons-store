@@ -2,7 +2,7 @@
 
 Status: ACCEPTED as a register, 2026-10-24. Owner: the developer. Approver: Ravi Kiran.
 
-**There are two kinds of agent here and they run on different keys.** Four AI features run
+**There are two kinds of agent here and they run on different keys.** Five AI features run
 inside the app for the store's staff, on the store's Anthropic key held in Vercel. The build
 side has one autonomous agent (the Slack autopilot, on the same key held in GitHub), two
 read-only reviewer agents and a set of skills used by Claude Code sessions, and a script, not
@@ -14,7 +14,7 @@ evidenced), PARTIAL, SCAFFOLDED (built, switched off), TARGET (not built).
 
 ## Inside the app (used by store staff)
 
-All four call the Anthropic Messages API directly with `ANTHROPIC_API_KEY`, default model
+All of them call the Anthropic Messages API directly with `ANTHROPIC_API_KEY`, default model
 `claude-sonnet-5`, overridable with `ANTHROPIC_MODEL`. None sets a temperature, deliberately:
 current Claude models reject non-default sampling settings [R `src/app/api/extract/route.ts:103`].
 
@@ -24,11 +24,12 @@ current Claude models reject non-default sampling settings [R `src/app/api/extra
 | **Ask the store** | Answers questions from the store's own notes, vendors and invoices, with citations; also logs "log this issue: ..." straight into Suggestions | `/api/ask` [R `src/app/api/ask/route.ts:39`] | Dollar data withheld from roles that cannot see money [R `:36`, `:91`]; issue logging is deterministic, verbatim, attributed and only for signed-in members [R `:95-96`]; answer stripped to plain text [R `:166`] | BUILT |
 | **Reorder summary** | Turns the formula-based reorder list into a short plain-language summary | `/api/reorder` [R `src/app/api/reorder/route.ts:23`] | Money roles only once login is enforced [R `:33`]; plain text [R `:110`] | BUILT |
 | **Suggestion screenshot reader** | Describes a screenshot attached to an owner suggestion, so the developer digest carries it as text | `/api/feedback-triage` [R `src/app/api/feedback-triage/route.ts:12`] | Under 120 words, plain text [R `:21`, `:86`]; best-effort, never blocks saving the suggestion [R `:14`] | BUILT |
+| **Ask in Slack** | Answers a question that names the bot in the requests channel, in its thread, from the store's notes and vendors; asks "question or change?" when the words do not say | `/api/slack/events` [R `src/app/api/slack/events/route.ts:15`], `src/lib/slackAsk.ts` | Signed Slack requests only; asker treated as staff: no invoice read, no vendor money column, an answer with a dollar figure withheld; the ask route's grounding check, daily cap and `ai_call` log (route `slack_ask`); question vs build decided by words in `.github/scripts/slack-intent.cjs`, never a model (ADR-006) | BUILT in code, SCAFFOLDED live (needs the Vercel values and Slack event in docs/HANDOVER.md) |
 | Ask the store over a vector index | Same answers, at a data size one prompt cannot hold | Not built | | TARGET (deferred until the data outgrows one prompt [R `docs/ARCHITECTURE.md:279`]) |
 | Email invoice intake | Vendors email invoices to invoices@, the reader files them | AgentMail installed, not wired [R `docs/PLATFORM.md`] | Sender allowlist (design in docs/DOMAIN_EMAIL.md section 4) | SCAFFOLDED (blocked on the invoices@ mailbox) |
 
 **Who pays and who can switch it off after handover:** the store's Anthropic organization
-(HANDOVER Step 5). Removing `ANTHROPIC_API_KEY` from Vercel turns all four off; the app still
+(HANDOVER Step 5). Removing `ANTHROPIC_API_KEY` from Vercel turns them all off; the app still
 builds and the capture screen still offers Enter manually.
 
 ## Building the app (used by whoever develops it)
@@ -75,5 +76,7 @@ docs/HANDOVER.md. The rules every agent works under: CLAUDE.md and
 Each `[R]` above was read from the named file and line in this repository this session, plus
 the subagent and settings files read whole. One stale rule found and corrected (AG-01); one state killed on review: the tier classifier was first recorded as BUILT and is PARTIAL, because only the parked Jira loop calls it.
 Source: this repository.
+The Ask in Slack row was added on branch claude/slack-answers-2d32e7 (2026-10-30): read at
+the named line that session.
 The Golden-case evals row was added on branch ai-golden-evals (2026-10-24): 2 claims, both
 read at the named lines that session.

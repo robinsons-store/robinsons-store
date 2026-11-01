@@ -9,13 +9,18 @@
 // stops and needs a person. The state of every request is therefore visible to anyone
 // scrolling the channel, it survives this script being rewritten, and it costs no storage.
 // A message carrying ANY of those three is spoken for and is skipped, which is what stops
-// the loop working the same request forever. See CLAIMED below: all three, not two.
+// the loop working the same request forever. See CLAIMED below: every one of them, plus the two the answer route sets.
 //
 // WHAT IS WORK: a message that NAMES THE BOT. The channel this watches is the store's
 // ordinary channel, where people say hello and talk about the weekend, so an unaddressed
 // message is not a request. Without that rule "Hello Robinson Tech Team" becomes a pull
 // request. Naming the bot is the Slack-native way to address something and cannot be typed
 // by accident. A channel that exists only for requests can set SLACK_REQUIRE_MENTION=false.
+//
+// QUESTIONS ARE NOT WORK. A message that slack-intent.cjs calls a question is answered in its
+// thread by the app's Slack answer route within seconds, and one it calls unclear gets a
+// reply asking which was meant. Only "build" reaches this loop. The same file decides for
+// both, so a question cannot also become a pull request (docs/adr/ADR-006).
 //
 // WHAT IS NOT WORK: anything the bot itself said, anything from another app, and thread
 // replies. Replies are skipped on purpose for now: a thread under a finished request is
@@ -24,6 +29,10 @@
 //
 // Silent and empty-handed when SLACK_BOT_TOKEN or SLACK_REQUEST_CHANNEL is unset, so the
 // workflow is safe to merge before either exists.
+
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const { classifyMessage, ANSWERED, ASKED_WHICH } = require("./slack-intent.cjs");
 
 const TOKEN = (process.env.SLACK_BOT_TOKEN || "").trim();
 const CHANNEL = (process.env.SLACK_REQUEST_CHANNEL || "").trim();
@@ -38,6 +47,8 @@ export const PICKED_UP = "eyes";
 export const DONE = "white_check_mark";
 /** Tried, and it needs a person. Set by the status card when a build stops or fails. */
 export const STOPPED = "warning";
+/** Set by the app's Slack answer route: answered as a question, or asked which was meant. */
+export { ANSWERED, ASKED_WHICH };
 
 /**
  * Every reaction that means "this has been seen". ALL of them must be skipped.
@@ -51,7 +62,7 @@ export const STOPPED = "warning";
  * To retry one on purpose, take the reaction off the message. That is a deliberate act by
  * somebody who has looked at why it stopped.
  */
-export const CLAIMED = [PICKED_UP, DONE, STOPPED];
+export const CLAIMED = [PICKED_UP, DONE, STOPPED, ANSWERED, ASKED_WHICH];
 
 /**
  * The oldest message that is a request nobody has started, or null.
@@ -89,9 +100,12 @@ export function pickWork(messages, opts = {}) {
     if (requireMention && (!mention || !m.text.includes(mention))) continue;
     // The bot's name is addressing, not part of the request. "@bot add a phone column"
     // should reach the model as "add a phone column".
-    const text = mention ? m.text.split(mention).join(" ").replace(/\s+/g, " ").trim() : m.text.trim();
-    if (!text) continue;
-    return { ...m, text };
+    const addressedText = mention ? m.text.split(mention).join(" ") : m.text;
+    // Questions and unclear messages belong to the answer route, never to a build. The
+    // prefix ("build:") is addressing too, so the model gets the request alone.
+    const intent = classifyMessage(addressedText);
+    if (intent.kind !== "build" || !intent.text) continue;
+    return { ...m, text: intent.text };
   }
   return null;
 }
@@ -154,8 +168,6 @@ async function main() {
   out("request", work.text);
 }
 
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
 
 if (process.argv[1] && process.argv[1].endsWith("slack-find-work.mjs")) {
   await main();

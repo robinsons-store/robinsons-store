@@ -3,7 +3,7 @@
 // screen change it describes. No dollar figures live here, so it is safe for every role.
 
 export const APP_GUIDE = `
-WHAT THIS APP IS: the operations system for Robinson's General Store. It tracks vendors,
+WHAT THIS APP IS: the operations system for the store. It tracks vendors,
 orders, invoices, payments, credits, inventory counts, price signs, maintenance, HR,
 compliance, and the store's own knowledge, and it is the single place money owed to
 vendors is recorded and settled.
